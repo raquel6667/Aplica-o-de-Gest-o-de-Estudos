@@ -1,2 +1,2 @@
-# Aplicao-de-Gestao-de-Estudos
+# Aplicacao-de-Gestao-de-Estudos
 Plataforma web que liga estudantes e explicadores, com gestão de disciplinas e avaliações, agendamento de sessões, pagamentos, chat e ferramentas de estudo com apoio de IA.
