@@ -4,553 +4,227 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EduPlatform - Painel do Administrador</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 
-    <section id="auth-screen" class="auth-wrapper">
+    {% if not session.get('user') %}
+    <!-- ==================== TELA DE AUTENTICAÇÃO (US1.01) ==================== -->
+    <section class="auth-wrapper">
         <div class="auth-card">
             <div class="auth-header">
                 <div class="brand-logo">
                     <i class="fa-solid fa-graduation-cap"></i>
                 </div>
                 <h2>Portal Admin</h2>
-                <p>Insira as suas credenciais para aceder ao sistema</p>
+                <p style="font-size: 13px; color: #57534e; margin-top: 4px;">Insira as suas credenciais para aceder ao sistema</p>
             </div>
 
-            <form id="login-form" class="auth-form" onsubmit="handleLogin(event)">
+            <!-- Alertas de Erro/Sucesso -->
+            <div class="alert-container">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+            <form action="{{ url_for('login') }}" method="POST">
                 <div class="form-group">
                     <label for="username"><i class="fa-regular fa-user"></i> Nome de Administrador</label>
-                    <input type="text" id="username" placeholder="Digite o seu username" required autocomplete="username" value="admin">
+                    <!-- Campos limpos por defeito conforme requisito -->
+                    <input type="text" id="username" name="username" value="" placeholder="Digite o seu username" required autocomplete="username">
                 </div>
 
                 <div class="form-group">
                     <label for="password"><i class="fa-solid fa-lock"></i> Palavra-passe</label>
-                    <div class="password-input">
-                        <input type="password" id="password" placeholder="••••••••••••" required autocomplete="current-password" value="admin2026">
-                        <button type="button" class="toggle-password" onclick="togglePasswordVisibility()">
-                            <i class="fa-regular fa-eye" id="eye-icon"></i>
-                        </button>
-                    </div>
+                    <input type="password" id="password" name="password" value="" placeholder="••••••••••••" required autocomplete="current-password">
                 </div>
 
-                <div id="auth-error-msg" class="hidden" style="color: #f43f5e; font-size: 13px; margin-bottom: 12px; font-weight: 600;"></div>
-
-                <button type="submit" id="btn-login" class="btn btn-primary btn-block">
+                <button type="submit" class="btn btn-primary btn-block">
                     <span>Entrar no Painel</span>
                     <i class="fa-solid fa-arrow-right"></i>
                 </button>
             </form>
-
-            <div class="auth-footer">
-                <p><i class="fa-solid fa-shield-halved"></i> Acesso restrito a administradores autorizados.</p>
-            </div>
         </div>
     </section>
 
-    <div id="admin-dashboard" class="dashboard-wrapper hidden">
+    {% else %}
+
+    <!-- ==================== PAINEL DO ADMINISTRADOR (US2.01) ==================== -->
+    <div class="dashboard-wrapper">
+        <!-- Sidebar Navigation -->
         <aside class="sidebar">
-            <div class="sidebar-header">
-                <div class="brand-logo sm">
-                    <i class="fa-solid fa-graduation-cap"></i>
+            <div>
+                <div class="sidebar-header">
+                    <div class="brand-logo" style="width:36px; height:36px; font-size:16px;">
+                        <i class="fa-solid fa-graduation-cap"></i>
+                    </div>
+                    <span>StudyAI Admin</span>
                 </div>
-                <span class="brand-name">StudyAI <span class="badge badge-admin">Admin</span></span>
             </div>
 
-            <nav class="sidebar-nav">
-                <ul>
-                    <li id="nav-disciplinas" class="active">
-                        <a href="javascript:void(0)">
-                            <i class="fa-solid fa-book-bookmark"></i> <span>Disciplinas</span>
-                            <span class="badge badge-count" id="sidebar-disciplinas-count">0</span>
-                        </a>
-                    </li>
-                </ul>
-            </nav>
-
-            <div class="sidebar-footer">
-                <div class="user-profile">
-                    <div class="avatar" id="user-avatar">AD</div>
-                    <div class="user-info">
-                        <span class="user-name" id="user-display-name">Admin Principal</span>
-                        <span class="user-email" id="user-display-email">admin@plataforma.com</span>
-                    </div>
-                </div>
-                <button class="btn-logout" onclick="logout()" title="Terminar Sessão">
-                    <i class="fa-solid fa-right-from-bracket"></i>
-                </button>
+            <div class="user-info" style="font-size:12px;">
+                <p><strong>{{ session['user'].nome }}</strong></p>
+                <p style="color:#a8a29e;">{{ session['user'].email }}</p>
+                <a href="{{ url_for('logout') }}" class="btn btn-danger btn-block" style="margin-top:10px; font-size:11px;">
+                    <i class="fa-solid fa-right-from-bracket"></i> Terminar Sessão
+                </a>
             </div>
         </aside>
 
+        <!-- Main Content Area -->
         <main class="main-content">
-            <header class="top-header">
-                <div class="header-search">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="global-search" placeholder="Pesquisar disciplinas..." oninput="handleGlobalSearch()">
-                </div>
-                <div class="header-actions">
-                    <button class="btn btn-outline-primary" onclick="logout()">
-                        <i class="fa-solid fa-lock"></i> Terminar Sessão
-                    </button>
-                </div>
-            </header>
+            <h1 style="font-size:22px; margin-bottom:18px;">Gestão e Registo de Disciplinas</h1>
 
-            <div class="content-container">
+            <!-- Alertas -->
+            <div class="alert-container">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            </div>
 
-                <div id="view-disciplinas" class="tab-content active">
-                    <div class="page-title-box">
-                        <div>
-                            <h1>Gestão e Registo de Disciplinas</h1>
-                            <p>Adicione novas disciplinas curriculares, edite os dados existentes e gira a oferta educativa.</p>
+            <!-- Métricas -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>{{ stats.total }}</h3>
+                    <p style="font-size:12px; color:#57534e;">Total Disciplinas</p>
+                </div>
+                <div class="stat-card">
+                    <h3>{{ stats.ativas }}</h3>
+                    <p style="font-size:12px; color:#57534e;">Disciplinas Ativas</p>
+                </div>
+                <div class="stat-card">
+                    <h3>{{ stats.pendentes }}</h3>
+                    <p style="font-size:12px; color:#57534e;">Pendentes / Inativas</p>
+                </div>
+            </div>
+
+            <div class="grid-layout">
+                <!-- FORMULÁRIO DE REGISTO E EDIÇÃO DAS DISCIPLINAS -->
+                <section class="card">
+                    <h2 style="font-size:16px; margin-bottom:14px;">
+                        {% if disciplina_editar %}
+                            <i class="fa-solid fa-pen text-primary"></i> Editar Disciplina #{{ disciplina_editar.cod_disciplina }}
+                        {% else %}
+                            <i class="fa-solid fa-folder-plus text-primary"></i> Registar Nova Disciplina
+                        {% endif %}
+                    </h2>
+
+                    <form action="{{ url_for('guardar_disciplina') }}" method="POST">
+                        <input type="hidden" name="cod_disciplina" value="{{ disciplina_editar.cod_disciplina if disciplina_editar else '' }}">
+
+                        <div class="form-group">
+                            <label for="codigo">Código da Disciplina <span style="color:red;">*</span></label>
+                            <input type="text" id="codigo" name="codigo" value="{{ disciplina_editar.codigo if disciplina_editar else '' }}" placeholder="Ex: MAT101, FQ01, BIO02" required maxlength="20" style="text-transform: uppercase;">
                         </div>
+
+                        <div class="form-group">
+                            <label for="nome">Nome da Disciplina <span style="color:red;">*</span></label>
+                            <input type="text" id="nome" name="nome" value="{{ disciplina_editar.nome if disciplina_editar else '' }}" placeholder="Ex: Matemática A" required maxlength="150">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="estado">Estado <span style="color:red;">*</span></label>
+                            <select id="estado" name="estado" required>
+                                <option value="ativa" {% if disciplina_editar and disciplina_editar.estado == 'ativa' %}selected{% endif %}>Ativa</option>
+                                <option value="pendente" {% if disciplina_editar and disciplina_editar.estado == 'pendente' %}selected{% endif %}>Pendente</option>
+                                <option value="inativa" {% if disciplina_editar and disciplina_editar.estado == 'inativa' %}selected{% endif %}>Inativa</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="descricao">Descrição / Conteúdo Programático</label>
+                            <textarea id="descricao" name="descricao" rows="3" maxlength="500" placeholder="Breve resumo da disciplina...">{{ disciplina_editar.descricao if disciplina_editar else '' }}</textarea>
+                        </div>
+
+                        <div style="display:flex; gap:8px; justify-content:flex-end;">
+                            {% if disciplina_editar %}
+                                <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancelar</a>
+                            {% endif %}
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fa-solid fa-check"></i> Guardar Disciplina
+                            </button>
+                        </div>
+                    </form>
+                </section>
+
+                <!-- TABELA DE CONSULTA DE DISCIPLINAS COM CÓDIGO E NOME -->
+                <section class="card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                        <h2 style="font-size:16px;">Disciplinas Registadas</h2>
+
+                        <form action="{{ url_for('index') }}" method="GET" style="display:flex; gap:8px;">
+                            <select name="estado" style="padding:6px; font-size:12px; border-radius:6px; border:1px solid #e7e5e4;">
+                                <option value="">Todos os Estados</option>
+                                <option value="ativa" {% if estado_filtro == 'ativa' %}selected{% endif %}>Ativas</option>
+                                <option value="pendente" {% if estado_filtro == 'pendente' %}selected{% endif %}>Pendentes</option>
+                                <option value="inativa" {% if estado_filtro == 'inativa' %}selected{% endif %}>Inativas</option>
+                            </select>
+                            <input type="text" name="search" value="{{ pesquisa }}" placeholder="Pesquisar..." style="padding:6px; font-size:12px; border-radius:6px; border:1px solid #e7e5e4;">
+                            <button type="submit" class="btn btn-secondary" style="padding:6px 10px;"><i class="fa-solid fa-filter"></i></button>
+                        </form>
                     </div>
 
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-icon icon-gold"><i class="fa-solid fa-book"></i></div>
-                            <div class="stat-details">
-                                <h3 id="stat-disciplinas-count">0</h3>
-                                <p>Total de Disciplinas</p>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon icon-emerald"><i class="fa-solid fa-layer-group"></i></div>
-                            <div class="stat-details">
-                                <h3 id="stat-ativas-count">0</h3>
-                                <p>Disciplinas Ativas</p>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon icon-blue"><i class="fa-solid fa-clock"></i></div>
-                            <div class="stat-details">
-                                <h3 id="stat-pendentes-count">0</h3>
-                                <p>Pendentes / Outras</p>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon icon-amber"><i class="fa-solid fa-filter"></i></div>
-                            <div class="stat-details">
-                                <h3 id="stat-filtradas-count">0</h3>
-                                <p>A Apresentar na Tabela</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="grid-layout">
-                        <!-- FORMULÁRIO COM O NOVO CAMPO CÓDIGO DA DISCIPLINA -->
-                        <section class="card form-card">
-                            <div class="card-header">
-                                <div class="card-title">
-                                    <i class="fa-solid fa-folder-plus text-primary"></i>
-                                    <h2 id="form-subject-title">Registar Nova Disciplina</h2>
-                                </div>
-                                <span class="subtitle" id="form-subject-subtitle">Preencha os dados da disciplina para disponibilizar no sistema</span>
-                            </div>
-
-                            <form id="register-subject-form" onsubmit="event.preventDefault(); saveSubject();">
-                                <input type="hidden" id="edit-subject-id" value="">
-                                
-                                <div class="form-grid">
-                                    <div class="form-group span-2">
-                                        <label for="codigo-disciplina">Código da Disciplina <span class="required">*</span></label>
-                                        <input type="text" id="codigo-disciplina" maxlength="20" placeholder="Ex: MAT101, FQ-01, BIO-02" required style="text-transform: uppercase;">
-                                    </div>
-
-                                    <div class="form-group span-2">
-                                        <label for="nome-disciplina">Nome da Disciplina <span class="required">*</span></label>
-                                        <input type="text" id="nome-disciplina" maxlength="150" placeholder="Ex: Matemática A, Física e Química, Biologia" required>
-                                    </div>
-
-                                    <div class="form-group span-2">
-                                        <label for="estado-disciplina">Estado <span class="required">*</span></label>
-                                        <select id="estado-disciplina" required>
-                                            <option value="ativa" selected>Ativa</option>
-                                            <option value="pendente">Pendente</option>
-                                            <option value="inativa">Inativa</option>
-                                        </select>
-                                    </div>
-
-                                    <div class="form-group span-2">
-                                        <label for="descricao-disciplina">Descrição e Programa Curricular</label>
-                                        <textarea id="descricao-disciplina" rows="3" maxlength="500" placeholder="Insira uma breve descrição sobre os tópicos lecionados..."></textarea>
-                                    </div>
-                                </div>
-
-                                <div class="form-footer">
-                                    <button type="button" class="btn btn-secondary" onclick="resetFormSubject()">
-                                        <i class="fa-solid fa-rotate-left"></i> Cancelar / Limpar
-                                    </button>
-                                    <button type="submit" id="btn-save-subject" class="btn btn-primary">
-                                        <i class="fa-solid fa-check"></i> <span id="btn-save-subject-text">Guardar Disciplina</span>
-                                    </button>
-                                </div>
-                            </form>
-                        </section>
-
-                        <!-- TABELA COM A COLUNA CÓDIGO DA DISCIPLINA -->
-                        <section class="card table-card">
-                            <div class="card-header border-bottom flex-column-mobile">
-                                <div class="card-title">
-                                    <i class="fa-solid fa-list-check text-primary"></i>
-                                    <h2>Disciplinas Registadas</h2>
-                                </div>
-                                
-                                <div class="filters-bar">
-                                    <div class="filter-item">
-                                        <i class="fa-solid fa-filter filter-icon"></i>
-                                        <select id="filter-disciplinas-estado" onchange="filterDisciplinas()">
-                                            <option value="">Todos os Estados</option>
-                                            <option value="ativa">Ativas</option>
-                                            <option value="pendente">Pendentes</option>
-                                            <option value="inativa">Inativas</option>
-                                        </select>
-                                    </div>
-                                    <div class="filter-item">
-                                        <input type="text" id="filter-disciplinas-search" class="table-search-input" placeholder="Pesquisar disciplina..." oninput="filterDisciplinas()">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="table-responsive">
-                                <table class="custom-table" id="subjects-table">
-                                    <thead>
+                    <div class="table-responsive">
+                        <table class="custom-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Código</th>
+                                    <th>Nome / Descrição</th>
+                                    <th>Estado</th>
+                                    <th style="text-align:right;">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if disciplinas %}
+                                    {% for d in disciplinas %}
                                         <tr>
-                                            <th>Código</th>
-                                            <th>Disciplina / Descrição</th>
-                                            <th>Estado</th>
-                                            <th class="text-right">Ações</th>
+                                            <td><code class="code-badge">#{{ d.cod_disciplina }}</code></td>
+                                            <td><code class="code-badge" style="background:#e0f2fe; color:#0369a1;">{{ d.codigo }}</code></td>
+                                            <td>
+                                                <strong>{{ d.nome }}</strong>
+                                                <div style="font-size:11px; color:#a8a29e;">{{ d.descricao or 'Sem descrição cadastrada' }}</div>
+                                            </td>
+                                            <td><span class="status-pill {{ d.estado }}">{{ d.estado }}</span></td>
+                                            <td style="text-align:right; display:flex; gap:6px; justify-content:flex-end;">
+                                                <a href="{{ url_for('index', edit_id=d.cod_disciplina) }}" class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" title="Editar">
+                                                    <i class="fa-solid fa-pen"></i>
+                                                </a>
+                                                <form action="{{ url_for('eliminar_disciplina', cod_disciplina=d.cod_disciplina) }}" method="POST">
+                                                    <button type="submit" class="btn btn-danger" style="padding:4px 8px; font-size:11px;" title="Eliminar">
+                                                        <i class="fa-solid fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
                                         </tr>
-                                    </thead>
-                                    <tbody id="subjects-tbody">
-                                    </tbody>
-                                </table>
-                            </div>
-                        </section>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="5" style="text-align:center; color:#a8a29e; padding:20px;">Nenhuma disciplina encontrada na base de dados.</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
                     </div>
-                </div>
-
+                </section>
             </div>
         </main>
     </div>
+    {% endif %}
 
-    <script>
-        const API_BASE_URL = "http://127.0.0.1:5000/api";
-        let disciplinasData = [];
-
-        document.addEventListener("DOMContentLoaded", function() {
-            checkAuthSession();
-        });
-
-        function escapeHtml(value) {
-            return String(value ?? '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;');
-        }
-
-        function isTokenExpired(token) {
-            try {
-                const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-                const payload = JSON.parse(atob(base64));
-                return !payload.exp || payload.exp * 1000 <= Date.now();
-            } catch (e) {
-                return true;
-            }
-        }
-
-        function handleUnauthorized(response) {
-            if (response.status === 401) {
-                alert('A sua sessão expirou ou é inválida. Faça login novamente.');
-                logout();
-                return true;
-            }
-            return false;
-        }
-
-        async function handleLogin(e) {
-            e.preventDefault();
-            const usernameInput = document.getElementById('username').value.trim();
-            const passwordInput = document.getElementById('password').value.trim();
-            const errorMsg = document.getElementById('auth-error-msg');
-            const btnLogin = document.getElementById('btn-login');
-
-            errorMsg.classList.add('hidden');
-            btnLogin.disabled = true;
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: usernameInput, password: passwordInput })
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.sucesso) {
-                    localStorage.setItem('admin_token', data.token);
-                    localStorage.setItem('admin_user', JSON.stringify(data.admin));
-                    showDashboard(data.admin);
-                } else {
-                    errorMsg.textContent = data.erro || 'Falha ao autenticar. Verifique os dados.';
-                    errorMsg.classList.remove('hidden');
-                }
-            } catch (err) {
-                errorMsg.textContent = 'Erro ao ligar ao servidor Python Flask. Verifique se o backend está a executar na porta 5000.';
-                errorMsg.classList.remove('hidden');
-            } finally {
-                btnLogin.disabled = false;
-            }
-        }
-
-        function checkAuthSession() {
-            const token = localStorage.getItem('admin_token');
-            const adminUser = localStorage.getItem('admin_user');
-
-            if (token && adminUser && !isTokenExpired(token)) {
-                showDashboard(JSON.parse(adminUser));
-            } else {
-                localStorage.removeItem('admin_token');
-                localStorage.removeItem('admin_user');
-                showAuthScreen();
-            }
-        }
-
-        function showDashboard(admin) {
-            document.getElementById('auth-screen').classList.add('hidden');
-            document.getElementById('admin-dashboard').classList.remove('hidden');
-
-            if (admin) {
-                document.getElementById('user-display-name').textContent = admin.nome || admin.username;
-                document.getElementById('user-display-email').textContent = admin.email;
-                document.getElementById('user-avatar').textContent = (admin.nome ? admin.nome.substring(0, 2) : 'AD').toUpperCase();
-            }
-
-            loadDisciplinas();
-        }
-
-        function logout() {
-            localStorage.removeItem('admin_token');
-            localStorage.removeItem('admin_user');
-            showAuthScreen();
-        }
-
-        function showAuthScreen() {
-            document.getElementById('admin-dashboard').classList.add('hidden');
-            document.getElementById('auth-screen').classList.remove('hidden');
-        }
-
-        function togglePasswordVisibility() {
-            const passwordInput = document.getElementById('password');
-            const eyeIcon = document.getElementById('eye-icon');
-            if (passwordInput.type === 'password') {
-                passwordInput.type = 'text';
-                eyeIcon.classList.remove('fa-eye');
-                eyeIcon.classList.add('fa-eye-slash');
-            } else {
-                passwordInput.type = 'password';
-                eyeIcon.classList.remove('fa-eye-slash');
-                eyeIcon.classList.add('fa-eye');
-            }
-        }
-
-        function getAuthHeaders() {
-            const token = localStorage.getItem('admin_token');
-            return {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            };
-        }
-
-        async function loadDisciplinas() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/disciplinas`);
-                const data = await response.json();
-
-                if (response.ok && data.sucesso) {
-                    disciplinasData = data.disciplinas;
-                    filterDisciplinas();
-                } else {
-                    alert('Erro ao carregar disciplinas: ' + (data.erro || 'Erro desconhecido'));
-                }
-            } catch (err) {
-                console.error("Erro na ligação à API:", err);
-            }
-        }
-
-        function renderDisciplinasTable(items) {
-            const tbody = document.getElementById('subjects-tbody');
-            tbody.innerHTML = '';
-
-            if (items.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Nenhuma disciplina encontrada na base de dados.</td></tr>`;
-            } else {
-                items.forEach(disc => {
-                    const tr = document.createElement('tr');
-                    
-                    let badgeClass = 'active';
-                    if (disc.estado === 'pendente') badgeClass = 'pending';
-                    if (disc.estado === 'inativa') badgeClass = 'inactive';
-
-                    tr.innerHTML = `
-                        <td><code class="code-badge">${escapeHtml(disc.codigo)}</code></td>
-                        <td>
-                            <div class="subject-cell">
-                                <div>
-                                    <strong class="subject-title">${escapeHtml(disc.nome)}</strong>
-                                    <span class="subject-sub">${escapeHtml(disc.descricao) || 'Sem descrição cadastrada'}</span>
-                                </div>
-                            </div>
-                        </td>
-                        <td><span class="status-pill ${badgeClass}">${escapeHtml(disc.estado)}</span></td>
-                        <td class="text-right">
-                            <button class="action-btn" title="Editar Disciplina" onclick="editSubject(${disc.cod_disciplina})">
-                                <i class="fa-solid fa-pen"></i>
-                            </button>
-                            <button class="action-btn danger" title="Eliminar Disciplina" onclick="deleteSubject(${disc.cod_disciplina})">
-                                <i class="fa-solid fa-trash"></i>
-                            </button>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            }
-
-            updateDashboardStats(items);
-        }
-
-        function filterDisciplinas() {
-            const search = document.getElementById('filter-disciplinas-search').value.toLowerCase().trim();
-            const estado = document.getElementById('filter-disciplinas-estado').value;
-
-            const filtered = disciplinasData.filter(d => {
-                const matchSearch = d.codigo.toLowerCase().includes(search) || 
-                                    d.nome.toLowerCase().includes(search) || 
-                                    (d.descricao && d.descricao.toLowerCase().includes(search));
-                const matchEstado = !estado || d.estado === estado;
-                return matchSearch && matchEstado;
-            });
-
-            renderDisciplinasTable(filtered);
-        }
-
-        function handleGlobalSearch() {
-            const query = document.getElementById('global-search').value.toLowerCase().trim();
-            document.getElementById('filter-disciplinas-search').value = query;
-            filterDisciplinas();
-        }
-
-        async function saveSubject() {
-            const editId = document.getElementById('edit-subject-id').value;
-            const codigo = document.getElementById('codigo-disciplina').value.trim().toUpperCase();
-            const nome = document.getElementById('nome-disciplina').value.trim();
-            const estado = document.getElementById('estado-disciplina').value;
-            const descricao = document.getElementById('descricao-disciplina').value.trim();
-
-            if (!codigo) {
-                alert('O código da disciplina é obrigatório.');
-                return;
-            }
-            if (!nome) {
-                alert('O nome da disciplina é obrigatório.');
-                return;
-            }
-
-            const payload = { codigo, nome, estado, descricao };
-            const isEdit = Boolean(editId);
-            const url = isEdit ? `${API_BASE_URL}/disciplinas/${editId}` : `${API_BASE_URL}/disciplinas`;
-            const method = isEdit ? 'PUT' : 'POST';
-
-            try {
-                const response = await fetch(url, {
-                    method: method,
-                    headers: getAuthHeaders(),
-                    body: JSON.stringify(payload)
-                });
-
-                if (handleUnauthorized(response)) return;
-                const data = await response.json();
-
-                if (response.ok && data.sucesso) {
-                    alert(data.mensagem || 'Operação realizada com sucesso!');
-                    resetFormSubject();
-                    await loadDisciplinas();
-                } else {
-                    alert('Erro: ' + (data.erro || 'Não foi possível guardar a disciplina.'));
-                }
-            } catch (err) {
-                alert('Erro na ligação com o servidor Python.');
-            }
-        }
-
-        function editSubject(id) {
-            const disc = disciplinasData.find(d => d.cod_disciplina === id);
-            if (!disc) return;
-
-            document.getElementById('edit-subject-id').value = disc.cod_disciplina;
-            document.getElementById('codigo-disciplina').value = disc.codigo;
-            document.getElementById('nome-disciplina').value = disc.nome;
-            document.getElementById('estado-disciplina').value = disc.estado;
-            document.getElementById('descricao-disciplina').value = disc.descricao || '';
-
-            document.getElementById('form-subject-title').textContent = "Editar Disciplina";
-            document.getElementById('form-subject-subtitle').textContent = `A alterar dados da disciplina: ${disc.codigo}`;
-            document.getElementById('btn-save-subject-text').textContent = "Atualizar Disciplina";
-            
-            document.getElementById('codigo-disciplina').focus();
-        }
-
-        async function deleteSubject(id) {
-            const disc = disciplinasData.find(d => d.cod_disciplina === id);
-            if (!disc) return;
-
-            if (confirm(`Tem a certeza que deseja eliminar a disciplina "${disc.codigo} - ${disc.nome}"?`)) {
-                try {
-                    const response = await fetch(`${API_BASE_URL}/disciplinas/${id}`, {
-                        method: 'DELETE',
-                        headers: getAuthHeaders()
-                    });
-
-                    if (handleUnauthorized(response)) return;
-                    const data = await response.json();
-
-                    if (response.ok && data.sucesso) {
-                        alert(data.mensagem);
-                        await loadDisciplinas();
-                    } else {
-                        alert('Erro ao eliminar: ' + (data.erro || 'Falha na eliminação.'));
-                    }
-                } catch (err) {
-                    alert('Erro de comunicação com o servidor.');
-                }
-            }
-        }
-
-        function resetFormSubject() {
-            document.getElementById('register-subject-form').reset();
-            document.getElementById('edit-subject-id').value = '';
-            document.getElementById('form-subject-title').textContent = "Registar Nova Disciplina";
-            document.getElementById('form-subject-subtitle').textContent = "Preencha os dados da disciplina para disponibilizar no sistema";
-            document.getElementById('btn-save-subject-text').textContent = "Guardar Disciplina";
-        }
-
-        function updateDashboardStats(filteredItems) {
-            const totalDisciplinas = disciplinasData.length;
-            const ativasCount = disciplinasData.filter(d => d.estado === 'ativa').length;
-            const pendentesCount = disciplinasData.filter(d => d.estado !== 'ativa').length;
-            const totalFiltradas = filteredItems.length;
-
-            document.getElementById('stat-disciplinas-count').textContent = totalDisciplinas;
-            document.getElementById('stat-ativas-count').textContent = ativasCount;
-            document.getElementById('stat-pendentes-count').textContent = pendentesCount;
-            document.getElementById('stat-filtradas-count').textContent = totalFiltradas;
-            document.getElementById('sidebar-disciplinas-count').textContent = totalDisciplinas;
-        }
-    </script>
 </body>
 </html>

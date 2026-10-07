@@ -1,22 +1,17 @@
 import os
-import datetime
 import functools
-import jwt
 import pymysql
-from flask import Flask, request, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)
+app.secret_key = os.environ.get('SECRET_KEY', 'chave_secreta_plataforma_estudos_2026_rbac')
 
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'chave_secreta_plataforma_estudos_2026')
-JWT_EXPIRATION_HOURS = 8
-
+# Configuração da Base de Dados MySQL
 DB_CONFIG = {
     'host': '127.0.0.1',
     'user': 'root',
-    'password': 'raquelmateus',
+    'password': 'raquelmateus',  # Palavra-passe do MySQL
     'database': 'plataforma_estudo',
     'cursorclass': pymysql.cursors.DictCursor,
     'autocommit': True
@@ -25,219 +20,227 @@ DB_CONFIG = {
 def get_db_connection():
     return pymysql.connect(**DB_CONFIG)
 
+# Decorador de Proteção RBAC (Apenas Administradores)
 def admin_required(f):
     @functools.wraps(f)
     def decorated(*args, **kwargs):
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return jsonify({'erro': 'Acesso não autorizado. Token ausente.'}), 401
-        
-        token = auth_header.split(" ")[1]
-        try:
-            payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
-            if payload.get('nivel_acesso') not in ['super_admin', 'admin']:
-                return jsonify({'erro': 'Acesso negado. Apenas administradores podem realizar esta operação.'}), 403
-            
-            request.current_user = payload
-        except jwt.ExpiredSignatureError:
-            return jsonify({'erro': 'Sessão expirada. Faça login novamente.'}), 401
-        except jwt.InvalidTokenError:
-            return jsonify({'erro': 'Token inválido.'}), 401
-            
+        if not session.get('user') or session['user'].get('nivel_acesso') not in ['super_admin', 'admin']:
+            flash('Acesso negado. Por favor, efetue login como Administrador.', 'error')
+            return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated
 
+# Constantes de Validação
 CODIGO_MAX = 20
 NOME_MAX = 150
 DESCRICAO_MAX = 500
 ESTADOS_VALIDOS = ('ativa', 'pendente', 'inativa')
 
-def validar_disciplina(data):
-    codigo = str(data.get('codigo') or '').strip().upper()
-    nome = str(data.get('nome') or '').strip()
-    descricao = str(data.get('descricao') or '').strip()
-    estado = str(data.get('estado') or 'ativa').strip()
+# ==========================================
+# ROTA PRINCIPAL & US1.01: AUTENTICAÇÃO
+# ==========================================
+@app.route('/', methods=['GET'])
+def index():
+    if not session.get('user'):
+        return render_template('template.html')
 
-    if not codigo:
-        return None, None, None, None, 'O código da disciplina é obrigatório.'
-    if len(codigo) > CODIGO_MAX:
-        return None, None, None, None, f'O código não pode ter mais de {CODIGO_MAX} caracteres.'
-    if not nome:
-        return None, None, None, None, 'O nome da disciplina é obrigatório.'
-    if len(nome) > NOME_MAX:
-        return None, None, None, None, f'O nome não pode ter mais de {NOME_MAX} caracteres.'
-    if len(descricao) > DESCRICAO_MAX:
-        return None, None, None, None, f'A descrição não pode ter mais de {DESCRICAO_MAX} caracteres.'
-    if estado not in ESTADOS_VALIDOS:
-        return None, None, None, None, 'Estado inválido. Use: ativa, pendente ou inativa.'
-    return codigo, nome, descricao, estado, None
+    estado_filtro = request.args.get('estado', '').strip()
+    pesquisa = request.args.get('search', '').strip()
+    edit_id = request.args.get('edit_id', type=int)
 
-@app.errorhandler(pymysql.MySQLError)
-def handle_db_error(e):
-    app.logger.exception('Erro de base de dados')
-    return jsonify({'erro': 'Erro interno na base de dados. Tente novamente.'}), 500
+    disciplina_editar = None
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            sql = "SELECT * FROM disciplinas ORDER BY criado_em DESC"
+            cursor.execute(sql)
+            todas_disciplinas = cursor.fetchall()
 
-@app.route('/api/login', methods=['POST'])
+            disciplinas_filtradas = todas_disciplinas
+            if estado_filtro:
+                disciplinas_filtradas = [d for d in disciplinas_filtradas if d['estado'] == estado_filtro]
+            if pesquisa:
+                disciplinas_filtradas = [
+                    d for d in disciplinas_filtradas 
+                    if pesquisa.lower() in d['codigo'].lower() or pesquisa.lower() in d['nome'].lower() or (d['descricao'] and pesquisa.lower() in d['descricao'].lower())
+                ]
+
+            if edit_id:
+                cursor.execute("SELECT * FROM disciplinas WHERE cod_disciplina = %s", (edit_id,))
+                disciplina_editar = cursor.fetchone()
+
+            stats = {
+                'total': len(todas_disciplinas),
+                'ativas': sum(1 for d in todas_disciplinas if d['estado'] == 'ativa'),
+                'pendentes': sum(1 for d in todas_disciplinas if d['estado'] != 'ativa'),
+                'filtradas': len(disciplinas_filtradas)
+            }
+
+            return render_template(
+                'template.html',
+                disciplinas=disciplinas_filtradas,
+                stats=stats,
+                estado_filtro=estado_filtro,
+                pesquisa=pesquisa,
+                disciplina_editar=disciplina_editar
+            )
+    finally:
+        conn.close()
+
+@app.route('/login', methods=['POST'])
 def login():
-    data = request.get_json(silent=True) or {}
-    username = str(data.get('username') or '').strip()
-    password = str(data.get('password') or '').strip()
+    username = request.form.get('username', '').strip()
+    password = request.form.get('password', '').strip()
 
     if not username or not password:
-        return jsonify({'erro': 'Por favor, preencha o utilizador e a palavra-passe.'}), 400
+        flash('Por favor, preencha o utilizador e a palavra-passe.', 'error')
+        return render_template('template.html')
 
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            sql = "SELECT * FROM administrador WHERE username = %s"
-            cursor.execute(sql, (username,))
+            cursor.execute("SELECT * FROM administrador WHERE username = %s", (username,))
             admin = cursor.fetchone()
 
             if not admin:
-                return jsonify({'erro': 'Credenciais inválidas.'}), 401
+                flash('Credenciais inválidas.', 'error')
+                return render_template('template.html')
 
             stored_hash = admin['password_hash']
             pwd_valid = False
-            
-            if stored_hash.startswith('pbkdf2:') or stored_hash.startswith('scrypt:'):
+
+            if stored_hash.startswith(('pbkdf2:', 'scrypt:')):
                 pwd_valid = check_password_hash(stored_hash, password)
             else:
                 pwd_valid = (stored_hash == password)
                 if pwd_valid:
                     new_hash = generate_password_hash(password)
-                    cursor.execute("UPDATE administrador SET password_hash = %s WHERE cod_administrador = %s",
-                                   (new_hash, admin['cod_administrador']))
+                    cursor.execute(
+                        "UPDATE administrador SET password_hash = %s WHERE cod_administrador = %s",
+                        (new_hash, admin['cod_administrador'])
+                    )
 
             if not pwd_valid:
-                return jsonify({'erro': 'Credenciais inválidas.'}), 401
+                flash('Credenciais inválidas.', 'error')
+                return render_template('template.html')
 
-            cursor.execute("UPDATE administrador SET ultimo_login = NOW(), tentativas_falhadas = 0 WHERE cod_administrador = %s",
-                           (admin['cod_administrador'],))
+            cursor.execute("UPDATE administrador SET ultimo_login = NOW() WHERE cod_administrador = %s", (admin['cod_administrador'],))
 
-            token_payload = {
+            session['user'] = {
                 'cod_administrador': admin['cod_administrador'],
                 'username': admin['username'],
                 'nome': admin['nome'],
-                'nivel_acesso': admin['nivel_acesso'],
-                'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=JWT_EXPIRATION_HOURS)
+                'email': admin['email'],
+                'nivel_acesso': admin['nivel_acesso']
             }
-            token = jwt.encode(token_payload, app.config['SECRET_KEY'], algorithm="HS256")
-
-            return jsonify({
-                'sucesso': True,
-                'token': token,
-                'admin': {
-                    'cod_administrador': admin['cod_administrador'],
-                    'nome': admin['nome'],
-                    'username': admin['username'],
-                    'email': admin['email'],
-                    'nivel_acesso': admin['nivel_acesso']
-                }
-            }), 200
+            return redirect(url_for('index'))
     finally:
         conn.close()
 
-@app.route('/api/disciplinas', methods=['GET'])
-def get_disciplinas():
+@app.route('/logout', methods=['GET'])
+def logout():
+    session.clear()
+    flash('Sessão terminada com sucesso.', 'info')
+    return redirect(url_for('index'))
+
+# ==========================================
+# US2.01: GESTÃO E REGISTO DE DISCIPLINAS
+# ==========================================
+@app.route('/disciplinas/guardar', methods=['POST'])
+@admin_required
+def guardar_disciplina():
+    cod_disciplina = request.form.get('cod_disciplina', '').strip()
+    codigo = request.form.get('codigo', '').strip().upper()
+    nome = request.form.get('nome', '').strip()
+    estado = request.form.get('estado', 'ativa').strip()
+    descricao = request.form.get('descricao', '').strip()
+
+    # Validações dos DoDs
+    if not codigo:
+        flash('O código da disciplina é obrigatório.', 'error')
+        return redirect(url_for('index', edit_id=cod_disciplina if cod_disciplina else None))
+
+    if not nome:
+        flash('O nome da disciplina é obrigatório.', 'error')
+        return redirect(url_for('index', edit_id=cod_disciplina if cod_disciplina else None))
+
+    if len(codigo) > CODIGO_MAX:
+        flash(f'O código não pode ter mais de {CODIGO_MAX} caracteres.', 'error')
+        return redirect(url_for('index'))
+
+    if len(nome) > NOME_MAX:
+        flash(f'O nome não pode ter mais de {NOME_MAX} caracteres.', 'error')
+        return redirect(url_for('index'))
+
+    if len(descricao) > DESCRICAO_MAX:
+        flash(f'A descrição não pode ter mais de {DESCRICAO_MAX} caracteres.', 'error')
+        return redirect(url_for('index'))
+
+    if estado not in ESTADOS_VALIDOS:
+        flash('Estado inválido.', 'error')
+        return redirect(url_for('index'))
+
+    admin_id = session['user']['cod_administrador']
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            sql = "SELECT cod_disciplina, codigo, nome, descricao, estado, cod_administrador, criado_em FROM disciplinas ORDER BY criado_em DESC"
-            cursor.execute(sql)
-            disciplinas = cursor.fetchall()
-            return jsonify({'sucesso': True, 'disciplinas': disciplinas}), 200
+            if cod_disciplina:
+                # Edição: Verificar se código ou nome já existem noutra disciplina
+                cursor.execute(
+                    "SELECT cod_disciplina FROM disciplinas WHERE codigo = %s AND cod_disciplina <> %s",
+                    (codigo, cod_disciplina)
+                )
+                if cursor.fetchone():
+                    flash('Já existe outra disciplina registada com este código.', 'error')
+                    return redirect(url_for('index', edit_id=cod_disciplina))
+
+                cursor.execute(
+                    "SELECT cod_disciplina FROM disciplinas WHERE nome = %s AND cod_disciplina <> %s",
+                    (nome, cod_disciplina)
+                )
+                if cursor.fetchone():
+                    flash('Já existe outra disciplina registada com este nome.', 'error')
+                    return redirect(url_for('index', edit_id=cod_disciplina))
+
+                cursor.execute(
+                    "UPDATE disciplinas SET codigo = %s, nome = %s, estado = %s, descricao = %s WHERE cod_disciplina = %s",
+                    (codigo, nome, estado, descricao, cod_disciplina)
+                )
+                flash('Disciplina atualizada com sucesso!', 'success')
+            else:
+                # Criação: Verificar duplicação de código e nome
+                cursor.execute("SELECT cod_disciplina FROM disciplinas WHERE codigo = %s", (codigo,))
+                if cursor.fetchone():
+                    flash('Já existe uma disciplina registada com este código.', 'error')
+                    return redirect(url_for('index'))
+
+                cursor.execute("SELECT cod_disciplina FROM disciplinas WHERE nome = %s", (nome,))
+                if cursor.fetchone():
+                    flash('Já existe uma disciplina registada com este nome.', 'error')
+                    return redirect(url_for('index'))
+
+                cursor.execute(
+                    "INSERT INTO disciplinas (codigo, nome, estado, descricao, cod_administrador) VALUES (%s, %s, %s, %s, %s)",
+                    (codigo, nome, estado, descricao, admin_id)
+                )
+                flash('Disciplina registada com sucesso!', 'success')
     finally:
         conn.close()
 
-@app.route('/api/disciplinas', methods=['POST'])
+    return redirect(url_for('index'))
+
+@app.route('/disciplinas/eliminar/<int:cod_disciplina>', methods=['POST'])
 @admin_required
-def create_disciplina():
-    data = request.get_json(silent=True) or {}
-    codigo, nome, descricao, estado, erro = validar_disciplina(data)
-    if erro:
-        return jsonify({'erro': erro}), 400
-
-    admin_id = request.current_user['cod_administrador']
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT cod_disciplina FROM disciplinas WHERE codigo = %s", (codigo,))
-            if cursor.fetchone():
-                return jsonify({'erro': 'Já existe uma disciplina registada com este código.'}), 400
-
-            cursor.execute("SELECT cod_disciplina FROM disciplinas WHERE nome = %s", (nome,))
-            if cursor.fetchone():
-                return jsonify({'erro': 'Já existe uma disciplina registada com este nome.'}), 400
-
-            sql = """
-                INSERT INTO disciplinas (codigo, nome, descricao, estado, cod_administrador)
-                VALUES (%s, %s, %s, %s, %s)
-            """
-            cursor.execute(sql, (codigo, nome, descricao, estado, admin_id))
-            new_id = cursor.lastrowid
-
-            return jsonify({
-                'sucesso': True,
-                'mensagem': 'Disciplina registada com sucesso.',
-                'disciplina': {
-                    'cod_disciplina': new_id,
-                    'codigo': codigo,
-                    'nome': nome,
-                    'descricao': descricao,
-                    'estado': estado,
-                    'cod_administrador': admin_id
-                }
-            }), 201
-    finally:
-        conn.close()
-
-@app.route('/api/disciplinas/<int:cod_disciplina>', methods=['PUT'])
-@admin_required
-def update_disciplina(cod_disciplina):
-    data = request.get_json(silent=True) or {}
-    codigo, nome, descricao, estado, erro = validar_disciplina(data)
-    if erro:
-        return jsonify({'erro': erro}), 400
-
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT cod_disciplina FROM disciplinas WHERE cod_disciplina = %s", (cod_disciplina,))
-            if not cursor.fetchone():
-                return jsonify({'erro': 'Disciplina não encontrada.'}), 404
-
-            cursor.execute("SELECT cod_disciplina FROM disciplinas WHERE codigo = %s AND cod_disciplina <> %s",
-                           (codigo, cod_disciplina))
-            if cursor.fetchone():
-                return jsonify({'erro': 'Já existe outra disciplina registada com este código.'}), 400
-
-            cursor.execute("SELECT cod_disciplina FROM disciplinas WHERE nome = %s AND cod_disciplina <> %s",
-                           (nome, cod_disciplina))
-            if cursor.fetchone():
-                return jsonify({'erro': 'Já existe outra disciplina registada com este nome.'}), 400
-
-            sql = """
-                UPDATE disciplinas
-                SET codigo = %s, nome = %s, descricao = %s, estado = %s
-                WHERE cod_disciplina = %s
-            """
-            cursor.execute(sql, (codigo, nome, descricao, estado, cod_disciplina))
-            return jsonify({'sucesso': True, 'mensagem': 'Disciplina atualizada com sucesso.'}), 200
-    finally:
-        conn.close()
-
-@app.route('/api/disciplinas/<int:cod_disciplina>', methods=['DELETE'])
-@admin_required
-def delete_disciplina(cod_disciplina):
+def eliminar_disciplina(cod_disciplina):
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
             cursor.execute("DELETE FROM disciplinas WHERE cod_disciplina = %s", (cod_disciplina,))
-            if cursor.rowcount == 0:
-                return jsonify({'erro': 'Disciplina não encontrada.'}), 404
-            return jsonify({'sucesso': True, 'mensagem': 'Disciplina eliminada com sucesso.'}), 200
+            flash('Disciplina eliminada com sucesso.', 'success')
     finally:
         conn.close()
 
+    return redirect(url_for('index'))
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='127.0.0.1', port=5000, debug=True)

@@ -5,23 +5,22 @@ CREATE DATABASE plataforma_estudo
 
 USE plataforma_estudo;
 
+-- US1.01: Tabela do Administrador
 CREATE TABLE administrador (
     cod_administrador INT UNSIGNED NOT NULL AUTO_INCREMENT,
     username VARCHAR(50) NOT NULL,
     email VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     nome VARCHAR(100) NOT NULL DEFAULT 'Administrador Principal',
-    nivel_acesso ENUM('super_admin','admin','moderador') NOT NULL DEFAULT 'admin',
-    tentativas_falhadas TINYINT UNSIGNED NOT NULL DEFAULT 0,
-    bloqueado_ate DATETIME NULL,
+    nivel_acesso ENUM('super_admin','admin') NOT NULL DEFAULT 'admin',
     ultimo_login DATETIME NULL,
     criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    atualizado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (cod_administrador),
     UNIQUE KEY uq_administrador_username (username),
     UNIQUE KEY uq_administrador_email (email)
 ) ENGINE=InnoDB;
 
+-- US2.01: Tabela de Disciplinas (com Código, Nome, Descrição e Estado)
 CREATE TABLE disciplinas (
     cod_disciplina INT UNSIGNED NOT NULL AUTO_INCREMENT,
     codigo VARCHAR(20) NOT NULL,
@@ -40,5 +39,6 @@ CREATE TABLE disciplinas (
         ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
+-- Administrador por defeito (Credenciais: admin / admin2026)
 INSERT INTO administrador (username, email, password_hash, nome, nivel_acesso)
 VALUES ('admin', 'admin@plataforma.com', 'admin2026', 'Administrador Principal', 'super_admin');
