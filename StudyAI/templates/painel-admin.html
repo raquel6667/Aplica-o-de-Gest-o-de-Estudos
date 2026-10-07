@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Painel do Administrador - StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="admin-page">
+
+  <div class="admin-layout">
+    
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2>StudyAI</h2>
+      </div>
+      <nav class="sidebar-nav">
+        <ul>
+          <li>
+            <a href="#" class="nav-item active">
+              <span class="icon">📚</span>
+              <span>Disciplinas</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="{{ url_for('logout') }}" class="btn-logout">Sair</a>
+      </div>
+    </aside>
+
+    <div class="main-content">
+      <header class="top-header">
+        <h1>Painel do Administrador</h1>
+      </header>
+
+      <main class="admin-container">
+        
+        <!-- Formulário de Registo / Edição de Disciplinas -->
+        <section class="card">
+          <h2>{% if disciplina_edicao %}Editar Disciplina{% else %}Registar Nova Disciplina{% endif %}</h2>
+          
+          <form 
+            id="registerSubjectForm" 
+            action="{% if disciplina_edicao %}{{ url_for('editar_disciplina') }}{% else %}{{ url_for('registar_disciplina') }}{% endif %}" 
+            method="POST"
+          >
+            
+            {% if disciplina_edicao %}
+              <input type="hidden" name="subjectCodeOriginal" value="{{ disciplina_edicao.codigo }}">
+            {% endif %}
+
+            <div class="form-group">
+              <label for="subjectCode">Código</label>
+              <input 
+                type="text" 
+                id="subjectCode" 
+                name="subjectCode" 
+                placeholder="Ex: MAT101" 
+                value="{{ disciplina_edicao.codigo if disciplina_edicao else '' }}"
+                required
+              >
+            </div>
+
+            <div class="form-group">
+              <label for="subjectName">Nome</label>
+              <input 
+                type="text" 
+                id="subjectName" 
+                name="subjectName" 
+                placeholder="Ex: Matemática A" 
+                value="{{ disciplina_edicao.nome if disciplina_edicao else '' }}"
+                required
+              >
+            </div>
+
+            <div class="form-group">
+              <label for="subjectDescription">Descrição</label>
+              <textarea 
+                id="subjectDescription" 
+                name="subjectDescription" 
+                rows="3" 
+                placeholder="Breve descrição dos tópicos..."
+              >{{ disciplina_edicao.descricao if disciplina_edicao and disciplina_edicao.descricao else '' }}</textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="subjectStatus">Estado</label>
+              <select id="subjectStatus" name="subjectStatus" required>
+                <option value="ativa" {% if disciplina_edicao and disciplina_edicao.estado == 'ativa' %}selected{% endif %}>Ativa</option>
+                <option value="inativa" {% if disciplina_edicao and disciplina_edicao.estado == 'inativa' %}selected{% endif %}>Inativa</option>
+                <option value="pendente" {% if disciplina_edicao and disciplina_edicao.estado == 'pendente' %}selected{% endif %}>Pendente</option>
+              </select>
+            </div>
+
+            <button type="submit" class="btn">
+              {% if disciplina_edicao %}Guardar Alterações{% else %}Registar Disciplina{% endif %}
+            </button>
+
+            {% if disciplina_edicao %}
+              <a href="{{ url_for('painel_admin') }}" class="btn-cancel" style="text-align: center; display: block; text-decoration: none; line-height: 40px;">Cancelar Edição</a>
+            {% endif %}
+          </form>
+        </section>
+
+        <!-- Consulta de Disciplinas Existentes -->
+        <section class="card">
+          <h2>Consulta de Disciplinas Existentes</h2>
+          
+          <div style="overflow-x: auto;">
+            <table class="subjects-table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Nome</th>
+                  <th>Descrição</th>
+                  <th>Estado</th>
+                  <th>Cod. Admin</th>
+                  <th>Criado em</th>
+                  <th>Atualizado em</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for disciplina in disciplinas %}
+                <tr>
+                  <td>{{ disciplina.codigo }}</td>
+                  <td>{{ disciplina.nome }}</td>
+                  <td>{{ disciplina.descricao or '' }}</td>
+                  <td>{{ disciplina.estado.capitalize() }}</td>
+                  <td>{{ disciplina.cod_administrador or '-' }}</td>
+                  <td>{{ disciplina.criado_em.strftime('%Y-%m-%d %H:%M') if disciplina.criado_em else '' }}</td>
+                  <td>{{ disciplina.atualizado_em.strftime('%Y-%m-%d %H:%M') if disciplina.atualizado_em else '' }}</td>
+                  <td>
+                    <!-- Botão Editar -->
+                    <form action="{{ url_for('editar_disciplina') }}" method="GET" style="display: inline;">
+                      <input type="hidden" name="codigo" value="{{ disciplina.codigo }}">
+                      <button type="submit" class="btn-action edit">Editar</button>
+                    </form>
+                    
+                    <!-- Botão Eliminar -->
+                    <form action="{{ url_for('eliminar_disciplina') }}" method="POST" style="display: inline;" onsubmit="return confirm('Tem a certeza que deseja eliminar a disciplina {{ disciplina.codigo }}?');">
+                      <input type="hidden" name="codigo" value="{{ disciplina.codigo }}">
+                      <button type="submit" class="btn-action delete">Eliminar</button>
+                    </form>
+                  </td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="8" style="text-align: center;">Nenhuma disciplina registada.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+  </div>
+
+</body>
+</html>
