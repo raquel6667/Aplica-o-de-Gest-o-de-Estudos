@@ -3,25 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StudyAI - Painel do Administrador</title>
-    <!-- Google Fonts -->
+    <title>EduPlatform - Painel do Administrador</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- ==================== TELA DE AUTENTICAÇÃO (US1.01) ==================== -->
     <section id="auth-screen" class="auth-wrapper">
         <div class="auth-card">
             <div class="auth-header">
                 <div class="brand-logo">
                     <i class="fa-solid fa-graduation-cap"></i>
                 </div>
-                <h2>StudyAI Admin</h2>
+                <h2>Portal Admin</h2>
                 <p>Insira as suas credenciais para aceder ao sistema</p>
             </div>
 
@@ -55,9 +52,7 @@
         </div>
     </section>
 
-    <!-- ==================== PAINEL DO ADMINISTRADOR ==================== -->
     <div id="admin-dashboard" class="dashboard-wrapper hidden">
-        <!-- Sidebar Navigation -->
         <aside class="sidebar">
             <div class="sidebar-header">
                 <div class="brand-logo sm">
@@ -91,13 +86,11 @@
             </div>
         </aside>
 
-        <!-- Main Content Area -->
         <main class="main-content">
-            <!-- Top Header Bar -->
             <header class="top-header">
                 <div class="header-search">
                     <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="global-search" placeholder="Pesquisar por nome ou código..." oninput="handleGlobalSearch()">
+                    <input type="text" id="global-search" placeholder="Pesquisar disciplinas..." oninput="handleGlobalSearch()">
                 </div>
                 <div class="header-actions">
                     <button class="btn btn-outline-primary" onclick="logout()">
@@ -106,19 +99,16 @@
                 </div>
             </header>
 
-            <!-- Page Container -->
             <div class="content-container">
 
-                <!-- ==================== DISCIPLINAS (US2.01) ==================== -->
                 <div id="view-disciplinas" class="tab-content active">
                     <div class="page-title-box">
                         <div>
                             <h1>Gestão e Registo de Disciplinas</h1>
-                            <p>Adicione novas disciplinas curriculares, edite os dados existentes e gira a oferta educativa na plataforma StudyAI.</p>
+                            <p>Adicione novas disciplinas curriculares, edite os dados existentes e gira a oferta educativa.</p>
                         </div>
                     </div>
 
-                    <!-- Stats Summary Row -->
                     <div class="stats-grid">
                         <div class="stat-card">
                             <div class="stat-icon icon-gold"><i class="fa-solid fa-book"></i></div>
@@ -151,14 +141,14 @@
                     </div>
 
                     <div class="grid-layout">
-                        <!-- FORMULÁRIO DE REGISTO / EDIÇÃO DE DISCIPLINAS -->
+                        <!-- FORMULÁRIO COM O NOVO CAMPO CÓDIGO DA DISCIPLINA -->
                         <section class="card form-card">
                             <div class="card-header">
                                 <div class="card-title">
                                     <i class="fa-solid fa-folder-plus text-primary"></i>
                                     <h2 id="form-subject-title">Registar Nova Disciplina</h2>
                                 </div>
-                                <span class="subtitle" id="form-subject-subtitle">Preencha os dados da disciplina para disponibilizar no sistema StudyAI</span>
+                                <span class="subtitle" id="form-subject-subtitle">Preencha os dados da disciplina para disponibilizar no sistema</span>
                             </div>
 
                             <form id="register-subject-form" onsubmit="event.preventDefault(); saveSubject();">
@@ -166,8 +156,8 @@
                                 
                                 <div class="form-grid">
                                     <div class="form-group span-2">
-                                        <label for="codigo-disciplina">Cod_disciplina (Código/Sigla) <span class="required">*</span></label>
-                                        <input type="text" id="codigo-disciplina" maxlength="20" placeholder="Ex: MAT-A, FQ-10, BIO-11" required style="text-transform: uppercase;">
+                                        <label for="codigo-disciplina">Código da Disciplina <span class="required">*</span></label>
+                                        <input type="text" id="codigo-disciplina" maxlength="20" placeholder="Ex: MAT101, FQ-01, BIO-02" required style="text-transform: uppercase;">
                                     </div>
 
                                     <div class="form-group span-2">
@@ -201,7 +191,7 @@
                             </form>
                         </section>
 
-                        <!-- LISTA DE DISCIPLINAS COM FILTROS -->
+                        <!-- TABELA COM A COLUNA CÓDIGO DA DISCIPLINA -->
                         <section class="card table-card">
                             <div class="card-header border-bottom flex-column-mobile">
                                 <div class="card-title">
@@ -220,7 +210,7 @@
                                         </select>
                                     </div>
                                     <div class="filter-item">
-                                        <input type="text" id="filter-disciplinas-search" class="table-search-input" placeholder="Pesquisar por nome ou código..." oninput="filterDisciplinas()">
+                                        <input type="text" id="filter-disciplinas-search" class="table-search-input" placeholder="Pesquisar disciplina..." oninput="filterDisciplinas()">
                                     </div>
                                 </div>
                             </div>
@@ -229,15 +219,13 @@
                                 <table class="custom-table" id="subjects-table">
                                     <thead>
                                         <tr>
-                                            <th>ID</th>
-                                            <th>Cod_disciplina</th>
-                                            <th>Nome / Descrição</th>
+                                            <th>Código</th>
+                                            <th>Disciplina / Descrição</th>
                                             <th>Estado</th>
                                             <th class="text-right">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody id="subjects-tbody">
-                                        <!-- Preenchido dinamicamente do Python via REST API -->
                                     </tbody>
                                 </table>
                             </div>
@@ -249,7 +237,6 @@
         </main>
     </div>
 
-    <!-- SCRIPT DE INTEGRAÇÃO COM BACKEND PYTHON -->
     <script>
         const API_BASE_URL = "http://127.0.0.1:5000/api";
         let disciplinasData = [];
@@ -401,7 +388,7 @@
             tbody.innerHTML = '';
 
             if (items.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Nenhuma disciplina encontrada na base de dados.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Nenhuma disciplina encontrada na base de dados.</td></tr>`;
             } else {
                 items.forEach(disc => {
                     const tr = document.createElement('tr');
@@ -411,8 +398,7 @@
                     if (disc.estado === 'inativa') badgeClass = 'inactive';
 
                     tr.innerHTML = `
-                        <td><code class="code-badge">#${disc.cod_disciplina}</code></td>
-                        <td><code class="code-badge" style="background-color: #fef08a; color: #b45309;">${escapeHtml(disc.codigo_disciplina)}</code></td>
+                        <td><code class="code-badge">${escapeHtml(disc.codigo)}</code></td>
                         <td>
                             <div class="subject-cell">
                                 <div>
@@ -443,8 +429,8 @@
             const estado = document.getElementById('filter-disciplinas-estado').value;
 
             const filtered = disciplinasData.filter(d => {
-                const matchSearch = d.nome.toLowerCase().includes(search) || 
-                                    (d.codigo_disciplina && d.codigo_disciplina.toLowerCase().includes(search)) ||
+                const matchSearch = d.codigo.toLowerCase().includes(search) || 
+                                    d.nome.toLowerCase().includes(search) || 
                                     (d.descricao && d.descricao.toLowerCase().includes(search));
                 const matchEstado = !estado || d.estado === estado;
                 return matchSearch && matchEstado;
@@ -461,13 +447,13 @@
 
         async function saveSubject() {
             const editId = document.getElementById('edit-subject-id').value;
-            const codigo_disciplina = document.getElementById('codigo-disciplina').value.trim().toUpperCase();
+            const codigo = document.getElementById('codigo-disciplina').value.trim().toUpperCase();
             const nome = document.getElementById('nome-disciplina').value.trim();
             const estado = document.getElementById('estado-disciplina').value;
             const descricao = document.getElementById('descricao-disciplina').value.trim();
 
-            if (!codigo_disciplina) {
-                alert('O código da disciplina (Cod_disciplina) é obrigatório.');
+            if (!codigo) {
+                alert('O código da disciplina é obrigatório.');
                 return;
             }
             if (!nome) {
@@ -475,7 +461,7 @@
                 return;
             }
 
-            const payload = { codigo_disciplina, nome, estado, descricao };
+            const payload = { codigo, nome, estado, descricao };
             const isEdit = Boolean(editId);
             const url = isEdit ? `${API_BASE_URL}/disciplinas/${editId}` : `${API_BASE_URL}/disciplinas`;
             const method = isEdit ? 'PUT' : 'POST';
@@ -507,13 +493,13 @@
             if (!disc) return;
 
             document.getElementById('edit-subject-id').value = disc.cod_disciplina;
-            document.getElementById('codigo-disciplina').value = disc.codigo_disciplina || '';
+            document.getElementById('codigo-disciplina').value = disc.codigo;
             document.getElementById('nome-disciplina').value = disc.nome;
             document.getElementById('estado-disciplina').value = disc.estado;
             document.getElementById('descricao-disciplina').value = disc.descricao || '';
 
             document.getElementById('form-subject-title').textContent = "Editar Disciplina";
-            document.getElementById('form-subject-subtitle').textContent = `A alterar dados da disciplina ID: #${disc.cod_disciplina}`;
+            document.getElementById('form-subject-subtitle').textContent = `A alterar dados da disciplina: ${disc.codigo}`;
             document.getElementById('btn-save-subject-text').textContent = "Atualizar Disciplina";
             
             document.getElementById('codigo-disciplina').focus();
@@ -523,7 +509,7 @@
             const disc = disciplinasData.find(d => d.cod_disciplina === id);
             if (!disc) return;
 
-            if (confirm(`Tem a certeza que deseja eliminar a disciplina "${disc.nome}" (${disc.codigo_disciplina})?`)) {
+            if (confirm(`Tem a certeza que deseja eliminar a disciplina "${disc.codigo} - ${disc.nome}"?`)) {
                 try {
                     const response = await fetch(`${API_BASE_URL}/disciplinas/${id}`, {
                         method: 'DELETE',
@@ -549,7 +535,7 @@
             document.getElementById('register-subject-form').reset();
             document.getElementById('edit-subject-id').value = '';
             document.getElementById('form-subject-title').textContent = "Registar Nova Disciplina";
-            document.getElementById('form-subject-subtitle').textContent = "Preencha os dados da disciplina para disponibilizar no sistema StudyAI";
+            document.getElementById('form-subject-subtitle').textContent = "Preencha os dados da disciplina para disponibilizar no sistema";
             document.getElementById('btn-save-subject-text').textContent = "Guardar Disciplina";
         }
 

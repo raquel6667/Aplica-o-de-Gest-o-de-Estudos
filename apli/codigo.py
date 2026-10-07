@@ -10,11 +10,9 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-# Configurações de Segurança
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'chave_secreta_plataforma_estudos_2026')
 JWT_EXPIRATION_HOURS = 8
 
-# Configuração da Base de Dados MySQL
 DB_CONFIG = {
     'host': '127.0.0.1',
     'user': 'root',
@@ -27,9 +25,6 @@ DB_CONFIG = {
 def get_db_connection():
     return pymysql.connect(**DB_CONFIG)
 
-# ==========================================
-# MIDDLEWARE & DECORADORES (RBAC)
-# ==========================================
 def admin_required(f):
     @functools.wraps(f)
     def decorated(*args, **kwargs):
@@ -52,25 +47,21 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
-# ==========================================
-# VALIDAÇÃO E TRATAMENTO DE ERROS
-# ==========================================
 CODIGO_MAX = 20
 NOME_MAX = 150
 DESCRICAO_MAX = 500
 ESTADOS_VALIDOS = ('ativa', 'pendente', 'inativa')
 
 def validar_disciplina(data):
-    """Devolve (codigo_disciplina, nome, descricao, estado, erro)."""
-    codigo = str(data.get('codigo_disciplina') or '').strip().upper()
+    codigo = str(data.get('codigo') or '').strip().upper()
     nome = str(data.get('nome') or '').strip()
     descricao = str(data.get('descricao') or '').strip()
     estado = str(data.get('estado') or 'ativa').strip()
 
     if not codigo:
-        return None, None, None, None, 'O código da disciplina (Cod_disciplina) é obrigatório.'
+        return None, None, None, None, 'O código da disciplina é obrigatório.'
     if len(codigo) > CODIGO_MAX:
-        return None, None, None, None, f'O código da disciplina não pode ter mais de {CODIGO_MAX} caracteres.'
+        return None, None, None, None, f'O código não pode ter mais de {CODIGO_MAX} caracteres.'
     if not nome:
         return None, None, None, None, 'O nome da disciplina é obrigatório.'
     if len(nome) > NOME_MAX:
@@ -86,9 +77,6 @@ def handle_db_error(e):
     app.logger.exception('Erro de base de dados')
     return jsonify({'erro': 'Erro interno na base de dados. Tente novamente.'}), 500
 
-# ==========================================
-# US1.01: AUTENTICAÇÃO DO ADMINISTRADOR
-# ==========================================
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.get_json(silent=True) or {}
@@ -149,16 +137,12 @@ def login():
     finally:
         conn.close()
 
-# ==========================================
-# US2.01: GESTÃO E REGISTO DE DISCIPLINAS
-# ==========================================
-
 @app.route('/api/disciplinas', methods=['GET'])
 def get_disciplinas():
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            sql = "SELECT cod_disciplina, codigo_disciplina, nome, descricao, estado, cod_administrador, criado_em FROM disciplinas ORDER BY criado_em DESC"
+            sql = "SELECT cod_disciplina, codigo, nome, descricao, estado, cod_administrador, criado_em FROM disciplinas ORDER BY criado_em DESC"
             cursor.execute(sql)
             disciplinas = cursor.fetchall()
             return jsonify({'sucesso': True, 'disciplinas': disciplinas}), 200
@@ -177,13 +161,16 @@ def create_disciplina():
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            # Verificar se já existe o mesmo Cod_disciplina
-            cursor.execute("SELECT cod_disciplina FROM disciplinas WHERE codigo_disciplina = %s", (codigo,))
+            cursor.execute("SELECT cod_disciplina FROM disciplinas WHERE codigo = %s", (codigo,))
             if cursor.fetchone():
-                return jsonify({'erro': 'Já existe uma disciplina registada com este código (Cod_disciplina).'}), 400
+                return jsonify({'erro': 'Já existe uma disciplina registada com este código.'}), 400
+
+            cursor.execute("SELECT cod_disciplina FROM disciplinas WHERE nome = %s", (nome,))
+            if cursor.fetchone():
+                return jsonify({'erro': 'Já existe uma disciplina registada com este nome.'}), 400
 
             sql = """
-                INSERT INTO disciplinas (codigo_disciplina, nome, descricao, estado, cod_administrador)
+                INSERT INTO disciplinas (codigo, nome, descricao, estado, cod_administrador)
                 VALUES (%s, %s, %s, %s, %s)
             """
             cursor.execute(sql, (codigo, nome, descricao, estado, admin_id))
@@ -194,7 +181,7 @@ def create_disciplina():
                 'mensagem': 'Disciplina registada com sucesso.',
                 'disciplina': {
                     'cod_disciplina': new_id,
-                    'codigo_disciplina': codigo,
+                    'codigo': codigo,
                     'nome': nome,
                     'descricao': descricao,
                     'estado': estado,
@@ -219,15 +206,19 @@ def update_disciplina(cod_disciplina):
             if not cursor.fetchone():
                 return jsonify({'erro': 'Disciplina não encontrada.'}), 404
 
-            # Verificar colisão do código
-            cursor.execute("SELECT cod_disciplina FROM disciplinas WHERE codigo_disciplina = %s AND cod_disciplina <> %s",
+            cursor.execute("SELECT cod_disciplina FROM disciplinas WHERE codigo = %s AND cod_disciplina <> %s",
                            (codigo, cod_disciplina))
             if cursor.fetchone():
-                return jsonify({'erro': 'Já existe outra disciplina com este código (Cod_disciplina).'}), 400
+                return jsonify({'erro': 'Já existe outra disciplina registada com este código.'}), 400
+
+            cursor.execute("SELECT cod_disciplina FROM disciplinas WHERE nome = %s AND cod_disciplina <> %s",
+                           (nome, cod_disciplina))
+            if cursor.fetchone():
+                return jsonify({'erro': 'Já existe outra disciplina registada com este nome.'}), 400
 
             sql = """
                 UPDATE disciplinas
-                SET codigo_disciplina = %s, nome = %s, descricao = %s, estado = %s
+                SET codigo = %s, nome = %s, descricao = %s, estado = %s
                 WHERE cod_disciplina = %s
             """
             cursor.execute(sql, (codigo, nome, descricao, estado, cod_disciplina))
@@ -249,5 +240,4 @@ def delete_disciplina(cod_disciplina):
         conn.close()
 
 if __name__ == '__main__':
-    debug = os.environ.get('FLASK_DEBUG') == '1'
-    app.run(host='0.0.0.0' if debug else '127.0.0.1', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
