@@ -18,7 +18,7 @@ JWT_EXPIRATION_HOURS = 8
 DB_CONFIG = {
     'host': '127.0.0.1',
     'user': 'root',
-    'password': 'raquelmateus',  # Inserir a palavra-passe do MySQL se aplicável
+    'password': 'raquelmateus',
     'database': 'plataforma_estudo',
     'cursorclass': pymysql.cursors.DictCursor,
     'autocommit': True
@@ -40,7 +40,6 @@ def admin_required(f):
         token = auth_header.split(" ")[1]
         try:
             payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
-            # Validação do Nível de Acesso (RBAC)
             if payload.get('nivel_acesso') not in ['super_admin', 'admin']:
                 return jsonify({'erro': 'Acesso negado. Apenas administradores podem realizar esta operação.'}), 403
             
@@ -56,29 +55,34 @@ def admin_required(f):
 # ==========================================
 # VALIDAÇÃO E TRATAMENTO DE ERROS
 # ==========================================
-NOME_MAX = 150        # varchar(150) em disciplinas.nome
-DESCRICAO_MAX = 500   # varchar(500) em disciplinas.descricao
+CODIGO_MAX = 20
+NOME_MAX = 150
+DESCRICAO_MAX = 500
 ESTADOS_VALIDOS = ('ativa', 'pendente', 'inativa')
 
 def validar_disciplina(data):
-    """Devolve (nome, descricao, estado, erro). Se erro != None, os restantes são inválidos."""
+    """Devolve (codigo_disciplina, nome, descricao, estado, erro)."""
+    codigo = str(data.get('codigo_disciplina') or '').strip().upper()
     nome = str(data.get('nome') or '').strip()
     descricao = str(data.get('descricao') or '').strip()
     estado = str(data.get('estado') or 'ativa').strip()
 
+    if not codigo:
+        return None, None, None, None, 'O código da disciplina (Cod_disciplina) é obrigatório.'
+    if len(codigo) > CODIGO_MAX:
+        return None, None, None, None, f'O código da disciplina não pode ter mais de {CODIGO_MAX} caracteres.'
     if not nome:
-        return None, None, None, 'O nome da disciplina é obrigatório.'
+        return None, None, None, None, 'O nome da disciplina é obrigatório.'
     if len(nome) > NOME_MAX:
-        return None, None, None, f'O nome não pode ter mais de {NOME_MAX} caracteres.'
+        return None, None, None, None, f'O nome não pode ter mais de {NOME_MAX} caracteres.'
     if len(descricao) > DESCRICAO_MAX:
-        return None, None, None, f'A descrição não pode ter mais de {DESCRICAO_MAX} caracteres.'
+        return None, None, None, None, f'A descrição não pode ter mais de {DESCRICAO_MAX} caracteres.'
     if estado not in ESTADOS_VALIDOS:
-        return None, None, None, 'Estado inválido. Use: ativa, pendente ou inativa.'
-    return nome, descricao, estado, None
+        return None, None, None, None, 'Estado inválido. Use: ativa, pendente ou inativa.'
+    return codigo, nome, descricao, estado, None
 
 @app.errorhandler(pymysql.MySQLError)
 def handle_db_error(e):
-    # Garante resposta JSON (e não HTML) em falhas de base de dados
     app.logger.exception('Erro de base de dados')
     return jsonify({'erro': 'Erro interno na base de dados. Tente novamente.'}), 500
 
@@ -97,7 +101,6 @@ def login():
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            # Procura pelo utilizador na base de dados
             sql = "SELECT * FROM administrador WHERE username = %s"
             cursor.execute(sql, (username,))
             admin = cursor.fetchone()
@@ -105,17 +108,14 @@ def login():
             if not admin:
                 return jsonify({'erro': 'Credenciais inválidas.'}), 401
 
-            # Verificação segura de password (hashing ou validação inicial)
             stored_hash = admin['password_hash']
             pwd_valid = False
             
             if stored_hash.startswith('pbkdf2:') or stored_hash.startswith('scrypt:'):
                 pwd_valid = check_password_hash(stored_hash, password)
             else:
-                # Compatibilidade com a inserção simples do script SQL inicial
                 pwd_valid = (stored_hash == password)
                 if pwd_valid:
-                    # Atualiza imediatamente para Hash Seguro na DB (Encriptação/Proteção)
                     new_hash = generate_password_hash(password)
                     cursor.execute("UPDATE administrador SET password_hash = %s WHERE cod_administrador = %s",
                                    (new_hash, admin['cod_administrador']))
@@ -123,11 +123,9 @@ def login():
             if not pwd_valid:
                 return jsonify({'erro': 'Credenciais inválidas.'}), 401
 
-            # Atualizar último login
             cursor.execute("UPDATE administrador SET ultimo_login = NOW(), tentativas_falhadas = 0 WHERE cod_administrador = %s",
                            (admin['cod_administrador'],))
 
-            # Gerar Token JWT com Role (RBAC)
             token_payload = {
                 'cod_administrador': admin['cod_administrador'],
                 'username': admin['username'],
@@ -160,7 +158,7 @@ def get_disciplinas():
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            sql = "SELECT cod_disciplina, nome, descricao, estado, cod_administrador, criado_em FROM disciplinas ORDER BY criado_em DESC"
+            sql = "SELECT cod_disciplina, codigo_disciplina, nome, descricao, estado, cod_administrador, criado_em FROM disciplinas ORDER BY criado_em DESC"
             cursor.execute(sql)
             disciplinas = cursor.fetchall()
             return jsonify({'sucesso': True, 'disciplinas': disciplinas}), 200
@@ -171,7 +169,7 @@ def get_disciplinas():
 @admin_required
 def create_disciplina():
     data = request.get_json(silent=True) or {}
-    nome, descricao, estado, erro = validar_disciplina(data)
+    codigo, nome, descricao, estado, erro = validar_disciplina(data)
     if erro:
         return jsonify({'erro': erro}), 400
 
@@ -179,16 +177,16 @@ def create_disciplina():
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            # Verificar duplicação de nome
-            cursor.execute("SELECT cod_disciplina FROM disciplinas WHERE nome = %s", (nome,))
+            # Verificar se já existe o mesmo Cod_disciplina
+            cursor.execute("SELECT cod_disciplina FROM disciplinas WHERE codigo_disciplina = %s", (codigo,))
             if cursor.fetchone():
-                return jsonify({'erro': 'Já existe uma disciplina registada com este nome.'}), 400
+                return jsonify({'erro': 'Já existe uma disciplina registada com este código (Cod_disciplina).'}), 400
 
             sql = """
-                INSERT INTO disciplinas (nome, descricao, estado, cod_administrador)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO disciplinas (codigo_disciplina, nome, descricao, estado, cod_administrador)
+                VALUES (%s, %s, %s, %s, %s)
             """
-            cursor.execute(sql, (nome, descricao, estado, admin_id))
+            cursor.execute(sql, (codigo, nome, descricao, estado, admin_id))
             new_id = cursor.lastrowid
 
             return jsonify({
@@ -196,6 +194,7 @@ def create_disciplina():
                 'mensagem': 'Disciplina registada com sucesso.',
                 'disciplina': {
                     'cod_disciplina': new_id,
+                    'codigo_disciplina': codigo,
                     'nome': nome,
                     'descricao': descricao,
                     'estado': estado,
@@ -209,30 +208,29 @@ def create_disciplina():
 @admin_required
 def update_disciplina(cod_disciplina):
     data = request.get_json(silent=True) or {}
-    nome, descricao, estado, erro = validar_disciplina(data)
+    codigo, nome, descricao, estado, erro = validar_disciplina(data)
     if erro:
         return jsonify({'erro': erro}), 400
 
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            # A disciplina tem de existir
             cursor.execute("SELECT cod_disciplina FROM disciplinas WHERE cod_disciplina = %s", (cod_disciplina,))
             if not cursor.fetchone():
                 return jsonify({'erro': 'Disciplina não encontrada.'}), 404
 
-            # O nome não pode colidir com outra disciplina
-            cursor.execute("SELECT cod_disciplina FROM disciplinas WHERE nome = %s AND cod_disciplina <> %s",
-                           (nome, cod_disciplina))
+            # Verificar colisão do código
+            cursor.execute("SELECT cod_disciplina FROM disciplinas WHERE codigo_disciplina = %s AND cod_disciplina <> %s",
+                           (codigo, cod_disciplina))
             if cursor.fetchone():
-                return jsonify({'erro': 'Já existe outra disciplina registada com este nome.'}), 400
+                return jsonify({'erro': 'Já existe outra disciplina com este código (Cod_disciplina).'}), 400
 
             sql = """
                 UPDATE disciplinas
-                SET nome = %s, descricao = %s, estado = %s
+                SET codigo_disciplina = %s, nome = %s, descricao = %s, estado = %s
                 WHERE cod_disciplina = %s
             """
-            cursor.execute(sql, (nome, descricao, estado, cod_disciplina))
+            cursor.execute(sql, (codigo, nome, descricao, estado, cod_disciplina))
             return jsonify({'sucesso': True, 'mensagem': 'Disciplina atualizada com sucesso.'}), 200
     finally:
         conn.close()
@@ -251,7 +249,5 @@ def delete_disciplina(cod_disciplina):
         conn.close()
 
 if __name__ == '__main__':
-    # Execução na porta 5000
-    # debug só com FLASK_DEBUG=1 (nunca em produção); por defeito só aceita ligações locais
     debug = os.environ.get('FLASK_DEBUG') == '1'
     app.run(host='0.0.0.0' if debug else '127.0.0.1', port=5000, debug=True)

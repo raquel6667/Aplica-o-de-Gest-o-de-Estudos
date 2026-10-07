@@ -24,6 +24,7 @@ CREATE TABLE administrador (
 
 CREATE TABLE disciplinas (
     cod_disciplina INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    codigo_disciplina VARCHAR(20) NOT NULL, -- Novo campo: Cod_disciplina (ex: MAT-A, FQ-10)
     nome VARCHAR(150) NOT NULL,
     descricao VARCHAR(500) NULL,
     estado ENUM('ativa', 'pendente', 'inativa') NOT NULL DEFAULT 'ativa',
@@ -31,7 +32,7 @@ CREATE TABLE disciplinas (
     criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     atualizado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (cod_disciplina),
-    UNIQUE KEY uq_disciplinas_nome (nome),
+    UNIQUE KEY uq_disciplinas_codigo (codigo_disciplina),
     KEY idx_disciplinas_nome (nome),
     CONSTRAINT fk_disciplinas_administrador
         FOREIGN KEY (cod_administrador) REFERENCES administrador (cod_administrador)
