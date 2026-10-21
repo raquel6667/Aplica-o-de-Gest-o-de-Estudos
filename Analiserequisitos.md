@@ -1,15 +1,14 @@
 # Requisitos não funcionais
-## RNF1- Tempo de resposta no máximo 3 segundos para páginas mais pesadas, sendo a média 1 segundo
-## RNF2 - Acesso condicionado por username password, seguindo o paradigma RBAC
-## RNF3 - Encriptação de dados pessoais (só por enquanto a password e o número do cartão de crédito)
-## RNF4 - Proteção de dados pessoais como password e número do cartão de crédito (encriptação)
-## RNF5 - Comunicação segura entre chats
-## RNF6 - Arquitetura web-based, compatível com Edge, Firefox, Chrome
-## RNF7 - Consumo de APIs externas ? (são pagas quase todas!) 
-## RNF8 - Manutenção de código
-## RNF9 - Design recetivo na interface do utilizador 
-## RNF10 - Website responsivo (telemóvel, computador…)
-## RNF11 - Disponibilidade pública do calendário geral
+## RNF1 - Tempo de resposta no máximo de 3 segundos e média de 1 segundo em todas as páginas, com até 100 utilizadores em simultâneo e 100 disciplinas registadas.
+## RNF2 - Acesso condicionado por username e password, seguindo o paradigma RBAC com três papéis (Administrador, Estudante e Explicador). A sessão expira após 30 minutos de inatividade e não há bloqueio de conta por tentativas falhadas.
+## RNF3 - Proteção de dados pessoais: as passwords são guardadas apenas como hash, a plataforma nunca guarda o número do cartão de crédito (pagamentos tratados por um serviço externo) e toda a comunicação usa HTTPS.
+## RNF4 - Comunicação segura entre chats: mensagens encriptadas em trânsito (HTTPS/WebSocket seguro), acessíveis apenas aos dois participantes; o administrador só as consulta quando existe uma reclamação.
+## RNF6 - Arquitetura web-based, compatível com Edge, Firefox, Chrome e Safari (duas versões estáveis mais recentes).
+## RNF7 - Consumo de APIs externas limitado ao Zoom e a um serviço de pagamentos. Novas APIs só são integradas depois de registadas neste requisito, com finalidade e custo estimado.
+## RNF8 - Manutenção de código: código legível e organizado, testes automáticos nas funções críticas, controlo de versões (Git), README e segredos fora do código.
+## RNF9 - Design responsivo na interface do utilizador (telemóvel, tablet e computador), a partir de 360 px de largura.
+## RNF10 - Calendário pessoal, visível apenas após login: o Estudante e o Explicador veem o seu; o Administrador não tem calendário. Não existe calendário público.
+
 
 
 # Regras de escrita de código
@@ -22,6 +21,9 @@
 # Requisitos funcionais para o 1 Sprint
 ## US1.01 Como administrador, quero autenticar-me com o username e password. 
 ## US2.01 Como administrador, quero registar as disciplinas
+
+
+
 
 # Requitos funcionais para o 2 Sprint
 ## US1 Gestão de Utilizadores e Acesso
