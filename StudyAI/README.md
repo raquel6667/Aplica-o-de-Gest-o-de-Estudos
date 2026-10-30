@@ -19,18 +19,7 @@ python app.py
 
 A sessão de login não expira por tempo: termina ao carregar em **Sair** ou ao fechar o browser.
 
-## Variáveis do `.env`
-| Variável | Para quê |
-|---|---|
-| `SECRET_KEY` | obrigatória; chave da sessão |
-| `DB_*` | ligação à base de dados |
-| `PUBLIC_BASE_URL` | endereço público (ex.: `https://studyai.pt`); usado nos regressos do PayPal/Google e nos links dos eventos |
-| `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | credenciais **sandbox** (developer.paypal.com → Apps & Credentials) |
-| `PAYPAL_WEBHOOK_ID` | id do webhook (ver abaixo) |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | cliente OAuth "Aplicação Web" (console.cloud.google.com) |
-| `GEMINI_API_KEY`, `GEMINI_MODEL` | chave da API do Google Gemini (aistudio.google.com/apikey) e modelo (por omissão `gemini-3.5-flash`) |
 
-Sem as credenciais a aplicação funciona; os botões de pagar/ligar Google/gerar com IA avisam que não estão configurados.
 
 ## PayPal (US4)
 - Fica sempre no **sandbox** (o endereço está fixo no código): nunca se movimenta dinheiro real.
