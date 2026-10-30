@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reclamações — Administrador StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="admin-page">
+  <div class="admin-layout">
+    {% set ativo = 'reclamacoes' %}
+    {% include '_sidebar_admin.html' %}
+
+    <div class="main-content">
+      <header class="top-header">
+        <h1>Reclamações sobre conversas</h1>
+      </header>
+
+      {% include '_flash.html' %}
+
+      <main class="admin-container">
+        <section class="card">
+          <form method="GET" action="{{ url_for('admin_reclamacoes') }}" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 18px;">
+            <div class="form-group" style="margin: 0; min-width: 200px;">
+              <label for="estado">Estado</label>
+              <select id="estado" name="estado">
+                <option value="">Todas</option>
+                <option value="aberta" {% if estado == 'aberta' %}selected{% endif %}>Abertas</option>
+                <option value="resolvida" {% if estado == 'resolvida' %}selected{% endif %}>Resolvidas</option>
+                <option value="recusada" {% if estado == 'recusada' %}selected{% endif %}>Recusadas</option>
+              </select>
+            </div>
+            <button type="submit" class="btn" style="height: 50px; width: auto;">Filtrar</button>
+          </form>
+
+          {% if reclamacoes %}
+          <div style="overflow-x: auto;">
+            <table class="subjects-table" style="min-width: 860px;">
+              <thead>
+                <tr><th>Data</th><th>Autor</th><th>Utilizador reclamado</th><th>Motivo</th><th>Estado</th><th></th></tr>
+              </thead>
+              <tbody>
+                {% for r in reclamacoes %}
+                <tr>
+                  <td>{{ r.criada_em.strftime('%d/%m/%Y %H:%M') }}</td>
+                  <td>{{ r.nome_autor }}<br><small>@{{ r.username_autor }}</small></td>
+                  <td>{{ r.nome_reclamado }}<br><small>@{{ r.username_reclamado }}</small></td>
+                  <td style="max-width: 320px; white-space: pre-wrap;">{{ r.motivo|truncate(160) }}</td>
+                  <td>
+                    <span style="display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 800;
+                      {% if r.estado == 'aberta' %}background:var(--danger-bg);color:var(--danger);{% elif r.estado == 'recusada' %}background:var(--surface-3);color:var(--text-2);{% else %}background:var(--success-bg);color:var(--success);{% endif %}">
+                      {{ {'aberta': 'Aberta', 'resolvida': 'Resolvida', 'recusada': 'Recusada'}[r.estado] }}
+                    </span>
+                  </td>
+                  <td><a href="{{ url_for('admin_ver_reclamacao', id_reclamacao=r.id) }}" class="btn-action edit" style="text-decoration: none;">Ver conversa</a></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+            <p style="color: var(--muted);">Nenhuma reclamação encontrada.</p>
+          {% endif %}
+        </section>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

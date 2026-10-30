@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calendário Google — StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <style>
+    #calendario { --fc-border-color: var(--line); --fc-today-bg-color: var(--cream); --fc-button-bg-color: var(--blue-700);
+                  --fc-button-border-color: var(--blue-700); --fc-button-hover-bg-color: var(--blue-800);
+                  --fc-button-active-bg-color: var(--blue-800); --fc-event-bg-color: var(--blue-700); --fc-event-border-color: var(--blue-700); }
+    #calendario .fc-toolbar-title { font-size: 1.15rem; text-transform: capitalize; }
+    #calendario .evento-sessao { background: var(--orange-600); border-color: var(--orange-600); }
+    #calendario .evento-pendente { background: var(--yellow-400); border-color: var(--yellow-500); }
+    #calendario .evento-pendente, #calendario .evento-pendente .fc-event-main { color: var(--amber-950); }
+    #calendario .evento-concluida, #calendario .evento-concluida_nao_paga { opacity: 0.6; }
+    .legenda-calendario { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0 0; color: var(--muted); font-size: 0.85rem; }
+    .legenda-calendario span::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 3px; background: var(--cor); }
+  </style>
+</head>
+<body class="admin-page">
+  {% from '_icones.html' import icone, logotipo %}
+  {% set ativo = 'calendario' %}
+  <div class="admin-layout">
+    {% include '_sidebar.html' %}
+
+    <div class="main-content">
+      <header class="top-header">
+        <h1>Definições do Calendário</h1>
+      </header>
+
+      {% include '_flash.html' %}
+
+      <main class="admin-container">
+        <section class="card" style="margin-bottom: 24px;">
+          <h2>O meu calendário</h2>
+          <p id="aviso-calendario" style="color: var(--warning); font-weight: 700;" hidden></p>
+          <div id="calendario"></div>
+          <div class="legenda-calendario">
+            <span style="--cor: var(--orange-600);">Sessão aceite</span>
+            <span style="--cor: var(--yellow-400);">Sessão por aceitar</span>
+            {% if ligado %}<span style="--cor: var(--blue-700);">Outros eventos do Google Calendar</span>{% endif %}
+          </div>
+          {% if not ligado and configurado %}
+            <p style="color: var(--muted); font-size: 0.85rem; margin-top: 8px;">Liga a tua conta Google (abaixo) para veres aqui também os teus outros eventos.</p>
+          {% endif %}
+        </section>
+
+        <section class="card" style="margin-bottom: 24px;">
+          <h2>Google Calendar</h2>
+          <p style="color: var(--muted);">
+            As sessões aceites são enviadas para o teu calendário principal do Google (sincronização num só sentido: plataforma → Google).
+            A autorização serve apenas para ligar o calendário, não para iniciar sessão, e só permite criar e apagar eventos.
+          </p>
+
+          {% if not configurado %}
+            <p style="color: var(--warning); font-weight: 700;">A integração com o Google Calendar ainda não está configurada no servidor.</p>
+          {% elif not ligado %}
+            <p><strong>Estado:</strong> conta Google não ligada.</p>
+            <a href="{{ url_for('google_ligar') }}" class="btn" style="margin-top: 8px;">Ligar conta Google</a>
+          {% else %}
+            <p><strong>Conta Google:</strong> <span class="etiqueta-tipo" style="background: var(--success-bg); color: var(--success);">{{ icone('verificado', 13) }} ligada</span></p>
+            <p><strong>Sincronização:</strong> {% if sincronizacao_ativa %}<span style="color:var(--success); font-weight:800;">ligada</span>{% else %}<span style="color:var(--warning); font-weight:800;">desligada</span>{% endif %}</p>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px;">
+              <form action="{{ url_for('google_sincronizacao') }}" method="POST" style="margin: 0;">
+                <input type="hidden" name="acao" value="{{ 'desligar' if sincronizacao_ativa else 'ligar' }}">
+                <button type="submit" class="btn" style="min-height: 44px;">{% if sincronizacao_ativa %}Desligar sincronização{% else %}Ligar sincronização{% endif %}</button>
+              </form>
+              <form action="{{ url_for('google_desligar') }}" method="POST" style="margin: 0;"
+                    onsubmit="return confirm('Desligar a conta Google? Os eventos já criados mantêm-se no teu calendário.');">
+                <button type="submit" class="btn-action delete" style="min-height: 44px; padding: 0 18px;">Desligar conta Google</button>
+              </form>
+            </div>
+            <p style="color: var(--muted); font-size: 0.85rem; margin-top: 12px;">
+              Ao ligar, só são sincronizadas as sessões futuras já aceites. Ao desligar, os eventos já criados mantêm-se.
+            </p>
+          {% endif %}
+        </section>
+
+        {% if nao_sincronizados %}
+        <section class="card">
+          <h2>{{ icone('aviso') }} Eventos não sincronizados</h2>
+          <ul>
+            {% for ev in nao_sincronizados %}
+              <li><a href="{{ url_for('ver_sessao', id_sessao=ev.id) }}">{{ ev.nome_disciplina }}</a> — {{ ev.data_hora.strftime('%d/%m/%Y %H:%M') }}</li>
+            {% endfor %}
+          </ul>
+          {% if sincronizacao_ativa %}
+          <form action="{{ url_for('google_repetir') }}" method="POST" style="margin-top: 12px;">
+            <button type="submit" class="btn" style="min-height: 44px;">Tentar novamente</button>
+          </form>
+          {% endif %}
+        </section>
+        {% endif %}
+      </main>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.15/locales/pt.global.min.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      var aviso = document.getElementById("aviso-calendario");
+      var calendario = new FullCalendar.Calendar(document.getElementById("calendario"), {
+        locale: "pt",
+        initialView: window.innerWidth < 700 ? "listWeek" : "timeGridWeek",
+        headerToolbar: { left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek,listWeek" },
+        slotMinTime: "07:00:00",
+        slotMaxTime: "23:00:00",
+        height: "auto",
+        nowIndicator: true,
+        events: function (info, sucesso, falha) {
+          fetch("{{ url_for('calendario_eventos') }}?start=" + encodeURIComponent(info.startStr) + "&end=" + encodeURIComponent(info.endStr))
+            .then(function (r) { return r.json(); })
+            .then(function (dados) {
+              aviso.textContent = dados.aviso || dados.erro || "";
+              aviso.hidden = !aviso.textContent;
+              sucesso(dados.eventos || []);
+            })
+            .catch(function () {
+              aviso.textContent = "Não foi possível carregar o calendário.";
+              aviso.hidden = false;
+              falha();
+            });
+        }
+      });
+      calendario.render();
+    });
+  </script>
+</body>
+</html>

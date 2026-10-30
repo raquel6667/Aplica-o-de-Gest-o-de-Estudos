@@ -1,0 +1,67 @@
+{# Palavra-passe: botão para mostrar/esconder o que se escreve em todos os campos de palavra-passe da página.
+   Num campo com data-contar-minimo aparece também o contador do mínimo de caracteres;
+   num campo com data-confirma="id" aparece o aviso quando não coincide com o outro campo. #}
+{% from '_icones.html' import icone %}
+<template id="ic-olho">{{ icone('olho', 18) }}</template>
+<template id="ic-olho-fechado">{{ icone('olho-fechado', 18) }}</template>
+<script>
+  (function () {
+    var MINIMO = {{ min_password }};
+    var olho = document.getElementById("ic-olho").innerHTML;
+    var olhoFechado = document.getElementById("ic-olho-fechado").innerHTML;
+
+    document.querySelectorAll('input[type="password"]').forEach(function (campo) {
+      var envolvente = document.createElement("span");
+      envolvente.className = "campo-password";
+      campo.parentNode.insertBefore(envolvente, campo);
+      envolvente.appendChild(campo);
+
+      var botao = document.createElement("button");
+      botao.type = "button";
+      botao.className = "botao-ver-password";
+      botao.innerHTML = olho;
+      botao.setAttribute("aria-label", "Mostrar a palavra-passe");
+      botao.setAttribute("aria-pressed", "false");
+      botao.title = "Mostrar a palavra-passe";
+      botao.addEventListener("click", function () {
+        var aVer = campo.type === "password";
+        campo.type = aVer ? "text" : "password";
+        botao.innerHTML = aVer ? olhoFechado : olho;
+        botao.setAttribute("aria-pressed", aVer ? "true" : "false");
+        botao.setAttribute("aria-label", aVer ? "Esconder a palavra-passe" : "Mostrar a palavra-passe");
+        botao.title = botao.getAttribute("aria-label");
+        campo.focus();
+      });
+      envolvente.appendChild(botao);
+    });
+
+    // Contador do mínimo de caracteres (registo).
+    document.querySelectorAll("[data-contar-minimo]").forEach(function (campo) {
+      var aviso = document.getElementById(campo.dataset.contarMinimo);
+      function atualizar() {
+        var n = campo.value.length;
+        var ok = n >= MINIMO;
+        aviso.textContent = ok ? "✓ Tem pelo menos " + MINIMO + " caracteres."
+                               : "Mínimo de " + MINIMO + " caracteres" + (n ? " (faltam " + (MINIMO - n) + ")." : ".");
+        aviso.classList.toggle("ok", ok);
+      }
+      campo.addEventListener("input", atualizar);
+      atualizar();
+    });
+
+    // Confirmação: avisa logo se as duas palavras-passe não coincidirem.
+    document.querySelectorAll("[data-confirma]").forEach(function (campo) {
+      var original = document.getElementById(campo.dataset.confirma);
+      var aviso = document.getElementById(campo.dataset.aviso);
+      function verificar() {
+        var diferente = campo.value && campo.value !== original.value;
+        aviso.hidden = !campo.value;
+        aviso.textContent = diferente ? "As palavras-passe não coincidem." : "✓ As palavras-passe coincidem.";
+        aviso.classList.toggle("ok", !diferente);
+        campo.setCustomValidity(diferente ? "As palavras-passe não coincidem." : "");
+      }
+      campo.addEventListener("input", verificar);
+      original.addEventListener("input", verificar);
+    });
+  })();
+</script>

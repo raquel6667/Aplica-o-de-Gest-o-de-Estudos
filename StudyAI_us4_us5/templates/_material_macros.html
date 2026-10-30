@@ -1,0 +1,10 @@
+{# US7.01: etiqueta da disciplina do material ("Disciplina inativa" / "Sem disciplina"). #}
+{% macro etiqueta_disciplina(m) -%}
+  {%- if m.codigo_disciplina -%}
+    {{ m.nome_disciplina }}{% if m.estado_disciplina != 'ativa' %} <span class="etiqueta-aviso">Disciplina inativa</span>{% endif %}
+  {%- elif m.id_disciplina_pessoal -%}
+    {{ m.nome_disciplina_pessoal }} <span class="etiqueta-tipo">pessoal</span>
+  {%- else -%}
+    <span class="etiqueta-aviso">Sem disciplina</span>
+  {%- endif -%}
+{%- endmacro %}

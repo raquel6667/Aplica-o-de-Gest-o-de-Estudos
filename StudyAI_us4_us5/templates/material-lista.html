@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Material de estudo — StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="admin-page">
+  {% from '_material_macros.html' import etiqueta_disciplina %}
+  {% from '_icones.html' import icone %}
+  {% set ativo = 'material' %}
+  <div class="admin-layout">
+    {% include '_sidebar.html' %}
+
+    <div class="main-content">
+      <header class="top-header">
+        <h1>Material de estudo</h1>
+      </header>
+
+      {% include '_flash.html' %}
+
+      <main class="admin-container">
+        <section class="card" style="margin-bottom: 24px;">
+          <h2>Criar material</h2>
+          <p style="color: var(--muted); font-size: 0.9rem;">O teu material é privado: só tu o vês.</p>
+          <div class="botoes-tipo-material">
+            {% if ia_configurada %}
+              <a href="{{ url_for('assistente_ia') }}" class="botao-tipo destaque">{{ icone('ia', 20) }}<span>Assistente Gemini<small>Conversa e gera material</small></span></a>
+            {% else %}
+              <span class="botao-tipo destaque indisponivel" title="O assistente Gemini não está configurado no servidor">{{ icone('ia', 20) }}<span>Assistente Gemini<small>Indisponível de momento</small></span></span>
+            {% endif %}
+            <a href="{{ url_for('novo_material', tipo='resumo') }}" class="botao-tipo">{{ icone('resumo', 20) }}<span>Novo resumo<small>Até 5 000 caracteres</small></span></a>
+            <a href="{{ url_for('novo_material', tipo='questionario') }}" class="botao-tipo">{{ icone('questionario', 20) }}<span>Novo questionário<small>Escolha múltipla</small></span></a>
+            <a href="{{ url_for('novo_material', tipo='flashcards') }}" class="botao-tipo">{{ icone('flashcards', 20) }}<span>Novos flashcards<small>Frente e verso</small></span></a>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>O meu material</h2>
+          <form method="GET" action="{{ url_for('lista_material') }}" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 18px;">
+            <div class="form-group" style="margin: 0; flex: 1 1 220px;">
+              <label for="q">Pesquisar</label>
+              <input type="search" id="q" name="q" value="{{ termo }}" placeholder="Título, disciplina ou conteúdo" />
+            </div>
+            <div class="form-group" style="margin: 0; min-width: 170px;">
+              <label for="tipo">Tipo</label>
+              <select id="tipo" name="tipo">
+                <option value="">Todos</option>
+                <option value="resumo" {% if tipo == 'resumo' %}selected{% endif %}>Resumos</option>
+                <option value="questionario" {% if tipo == 'questionario' %}selected{% endif %}>Questionários</option>
+                <option value="flashcards" {% if tipo == 'flashcards' %}selected{% endif %}>Flashcards</option>
+              </select>
+            </div>
+            <button type="submit" class="btn" style="height: 50px; width: auto;">Pesquisar</button>
+          </form>
+
+          {% if materiais %}
+            <ul class="lista-pessoas">
+              {% for m in materiais %}
+              <li>
+                <div class="pessoa">
+                  <strong>{{ m.titulo }} <span class="etiqueta-tipo">{{ m.tipo|tipo_material }}</span></strong>
+                  <small>
+                    {{ etiqueta_disciplina(m) }} ·
+                    {% if m.tipo == 'questionario' %}{{ m.itens|length }} pergunta(s) ·{% elif m.tipo == 'flashcards' %}{{ m.itens|length }} cartão(ões) ·{% endif %}
+                    atualizado a {{ m.atualizado_em.strftime('%d/%m/%Y %H:%M') }}
+                  </small>
+                </div>
+                <div class="acoes">
+                  <a href="{{ url_for('ver_material', id_material=m.id) }}" class="btn-action edit">{% if m.tipo == 'resumo' %}Abrir{% else %}Praticar{% endif %}</a>
+                  <a href="{{ url_for('editar_material', id_material=m.id) }}" class="btn-action edit">Editar</a>
+                </div>
+              </li>
+              {% endfor %}
+            </ul>
+          {% elif termo or tipo %}
+            <p style="color: var(--muted);">Nenhum material encontrado.</p>
+          {% else %}
+            <p style="color: var(--muted);">Ainda não criaste material de estudo.</p>
+          {% endif %}
+        </section>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

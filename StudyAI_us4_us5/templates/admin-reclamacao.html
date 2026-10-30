@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reclamação #{{ r.id }} — Administrador StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="admin-page">
+  {% from '_icones.html' import icone, logotipo %}
+  <div class="admin-layout">
+    {% set ativo = 'reclamacoes' %}
+    {% include '_sidebar_admin.html' %}
+
+    <div class="main-content">
+      <header class="top-header">
+        <h1>Reclamação #{{ r.id }} (só leitura)</h1>
+      </header>
+
+      {% include '_flash.html' %}
+
+      <main class="admin-container">
+        <section class="card" style="margin-bottom: 24px;">
+          <p style="margin-top: 0;"><a class="link-voltar" href="{{ url_for('admin_reclamacoes') }}">{{ icone('voltar', 16) }} Todas as reclamações</a></p>
+          <p><strong>Data:</strong> {{ r.criada_em.strftime('%d/%m/%Y %H:%M') }}</p>
+          <p><strong>Autor:</strong> {{ r.nome_autor }} (@{{ r.username_autor }})</p>
+          <p><strong>Utilizador reclamado:</strong> {{ r.nome_reclamado }} (@{{ r.username_reclamado }})</p>
+          <p><strong>Motivo:</strong></p>
+          <p style="white-space: pre-wrap; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface);">{{ r.motivo }}</p>
+          <p><strong>Estado:</strong>
+            {% if r.estado == 'aberta' %}Aberta
+            {% elif r.estado == 'recusada' %}Recusada em {{ r.resolvida_em.strftime('%d/%m/%Y %H:%M') }}
+            {% else %}Resolvida em {{ r.resolvida_em.strftime('%d/%m/%Y %H:%M') }}{% endif %}
+          </p>
+          {% if r.decisao %}<p><strong>Decisão:</strong> {{ r.decisao }}</p>{% endif %}
+          {% if r.estado == 'aberta' %}
+            <div class="botoes-material">
+              <form action="{{ url_for('admin_resolver_reclamacao', id_reclamacao=r.id) }}" method="POST" style="margin: 0;">
+                <button type="submit" class="btn-action edit" style="width: auto; padding: 0 18px; min-height: 40px;">{{ icone('verificado', 16) }} Marcar como resolvida</button>
+              </form>
+            </div>
+            <details class="acao-moderacao">
+              <summary>{{ icone('fechar', 16) }} Recusar a reclamação</summary>
+              <p class="dica-moderacao">A reclamação não tem fundamento: fecha-se sem consequências para @{{ r.username_reclamado }}.</p>
+              <form action="{{ url_for('admin_recusar_reclamacao', id_reclamacao=r.id) }}" method="POST">
+                <div class="form-group"><label for="motivo-recusar">Motivo *</label>
+                  <textarea id="motivo-recusar" name="motivo" maxlength="500" required placeholder="Porque é que a reclamação não procede?"></textarea></div>
+                <button type="submit" class="btn-action" style="width: auto; padding: 0 18px;">Recusar reclamação</button>
+              </form>
+            </details>
+          {% endif %}
+        </section>
+
+        <section class="card" style="margin-bottom: 24px;">
+          <h2>{{ icone('cadeado') }} Moderação da conta de @{{ conta.username }}</h2>
+          <p><strong>Estado da conta:</strong>
+            {% if conta.conta_eliminada %}<span class="etiqueta-aviso" style="margin-left: 0;">Eliminada</span>
+            {% elif conta.banida %}<span class="etiqueta-aviso" style="margin-left: 0; background: var(--danger-bg); color: var(--danger);">Banida</span>{% if conta.motivo_bloqueio %} — {{ conta.motivo_bloqueio }}{% endif %}
+            {% elif conta.suspensa %}<span class="etiqueta-aviso" style="margin-left: 0;">Bloqueada{% if conta.bloqueado_ate %} até {{ conta.bloqueado_ate.strftime('%d/%m/%Y %H:%M') }}{% endif %}</span>{% if conta.motivo_bloqueio %} — {{ conta.motivo_bloqueio }}{% endif %}
+            {% else %}<span class="etiqueta-tipo" style="margin-left: 0; background: var(--success-bg); color: var(--success);">Ativa</span>{% endif %}
+            · {{ conta.sessoes_futuras }} sessão(ões) futura(s) marcada(s)
+          </p>
+
+          {% if not conta.conta_eliminada %}
+          <div class="grade-moderacao">
+            {% if conta.suspensa %}
+              <form class="cartao-moderacao" action="{{ url_for('admin_levantar_suspensao', id_utilizador=conta.id_utilizador) }}" method="POST">
+                <h3>{{ 'Levantar o banimento' if conta.banida else 'Desbloquear já' }}</h3>
+                <p class="dica-moderacao">A conta volta a estar ativa.{% if conta.banida %} As sessões que foram canceladas não voltam.{% endif %}</p>
+                <input type="hidden" name="voltar" value="{{ url_for('admin_ver_reclamacao', id_reclamacao=r.id) }}">
+                <div class="form-group"><label for="motivo-levantar">Motivo *</label>
+                  <textarea id="motivo-levantar" name="motivo" maxlength="500" required></textarea></div>
+                <button type="submit" class="btn-action edit">{{ 'Levantar banimento' if conta.banida else 'Desbloquear' }}</button>
+              </form>
+            {% endif %}
+            {% if not conta.banida %}
+              <form class="cartao-moderacao" action="{{ url_for('admin_bloquear_conta', id_reclamacao=r.id) }}" method="POST">
+                <h3>Bloquear temporariamente</h3>
+                <p class="dica-moderacao">Não consegue entrar nem aparece nas pesquisas até ao fim do prazo. As sessões marcadas mantêm-se.</p>
+                <div class="form-group"><label for="dias">Duração *</label>
+                  <select id="dias" name="dias" required>
+                    {% for d in dias_bloqueio %}<option value="{{ d }}">{{ d }} dia{{ 's' if d > 1 }}</option>{% endfor %}
+                  </select></div>
+                <div class="form-group"><label for="motivo-bloquear">Motivo (é mostrado ao utilizador) *</label>
+                  <textarea id="motivo-bloquear" name="motivo" maxlength="500" required></textarea></div>
+                <button type="submit" class="btn-action delete">{{ 'Bloquear de novo' if conta.suspensa else 'Bloquear conta' }}</button>
+              </form>
+              <form class="cartao-moderacao" action="{{ url_for('admin_banir_conta', id_reclamacao=r.id) }}" method="POST"
+                    onsubmit="return confirm('Banir @{{ conta.username }} para sempre? As {{ conta.sessoes_futuras }} sessão(ões) futura(s) serão canceladas, com reembolso das que estiverem pagas.');">
+                <h3>Banir</h3>
+                <p class="dica-moderacao">Permanente: a conta deixa de entrar e as sessões futuras são canceladas (com reembolso das pagas).</p>
+                <input type="hidden" name="confirmar" value="1">
+                <div class="form-group"><label for="motivo-banir">Motivo (é mostrado ao utilizador) *</label>
+                  <textarea id="motivo-banir" name="motivo" maxlength="500" required></textarea></div>
+                <button type="submit" class="btn-action delete">Banir conta</button>
+              </form>
+            {% endif %}
+            <form class="cartao-moderacao" action="{{ url_for('admin_denunciar_conta', id_reclamacao=r.id) }}" method="POST">
+              <h3>Denunciar às autoridades</h3>
+              <p class="dica-moderacao">Regista a denúncia e gera um dossiê (conta, conversa, ficheiros e acessos) para imprimir ou guardar em PDF. Nada é enviado automaticamente.</p>
+              <div class="form-group"><label for="motivo-denunciar">Motivo da denúncia *</label>
+                <textarea id="motivo-denunciar" name="motivo" maxlength="500" required></textarea></div>
+              <button type="submit" class="btn-action">Gerar dossiê de denúncia</button>
+            </form>
+          </div>
+          {% endif %}
+
+          {% if historico %}
+            <h3 style="margin: 22px 0 10px; font-size: 0.95rem;">Histórico de moderação</h3>
+            <ul class="lista-pessoas">
+              {% for h in historico %}
+              <li>
+                <div class="pessoa">
+                  <strong>{{ {'bloqueio': 'Bloqueio', 'banimento': 'Banimento', 'levantamento': 'Conta reativada', 'denuncia': 'Denúncia'}[h.tipo] }}{% if h.ate %} até {{ h.ate.strftime('%d/%m/%Y %H:%M') }}{% endif %}</strong>
+                  <small>{{ h.criada_em.strftime('%d/%m/%Y %H:%M') }} · @{{ h.admin }} · {{ h.motivo }}</small>
+                </div>
+                {% if h.tipo == 'denuncia' %}
+                  <div class="acoes"><a class="btn-action edit" href="{{ url_for('admin_dossie_denuncia', id_denuncia=h.id) }}">Ver dossiê</a></div>
+                {% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </section>
+
+        <section class="card" style="margin-bottom: 24px;">
+          <h2>Conversa</h2>
+          <p style="color: var(--muted); font-size: 0.9rem;">Modo só leitura: não é possível escrever nem apagar mensagens.</p>
+          <div class="chat-mensagens" style="max-height: 60vh;">
+            {% for m in mensagens %}
+              <div class="chat-msg {% if m.id_autor == r.id_autor %}meu{% endif %}">
+                <strong style="display: block; font-size: 0.8rem;">{{ m.nome_autor }}</strong>
+                {% if m.id_ficheiro %}
+                  <div class="chat-ficheiro">
+                    {% if m.extensao in ('jpg', 'jpeg', 'png') %}
+                      <img src="{{ url_for('ver_ficheiro_chat', id_ficheiro=m.id_ficheiro) }}" alt="{{ m.nome_original }}" loading="lazy">
+                    {% endif %}
+                    <a href="{{ url_for('ver_ficheiro_chat', id_ficheiro=m.id_ficheiro) }}" target="_blank" rel="noopener">{{ icone('resumo', 16) }} {{ m.nome_original }}</a>
+                    · <a href="{{ url_for('ver_ficheiro_chat', id_ficheiro=m.id_ficheiro, descarregar=1) }}">Descarregar</a>
+                  </div>
+                {% endif %}
+                {% if m.texto %}<span>{{ m.texto }}</span>{% endif %}
+                <time>{{ m.enviada_em.strftime('%d/%m/%Y %H:%M') }}</time>
+              </div>
+            {% else %}
+              <p class="chat-vazio">Esta conversa não tem mensagens.</p>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="card" style="margin-bottom: 24px;">
+          <h2>Ficheiros partilhados</h2>
+          {% if ficheiros %}
+            <ul class="lista-pessoas">
+              {% for f in ficheiros %}
+              <li>
+                <div class="pessoa"><strong>{{ f.nome_original }}</strong><small>{{ f.extensao|upper }} · {{ f.nome_autor }} · {{ f.enviada_em.strftime('%d/%m/%Y %H:%M') }}</small></div>
+                <div class="acoes"><a href="{{ url_for('ver_ficheiro_chat', id_ficheiro=f.id_ficheiro, descarregar=1) }}" class="btn-action edit">Descarregar</a></div>
+              </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p style="color: var(--muted);">Não foram partilhados ficheiros nesta conversa.</p>
+          {% endif %}
+        </section>
+
+        <section class="card">
+          <h2>Registo de acessos a esta conversa</h2>
+          <ul style="margin: 0; padding-left: 18px; color: var(--ink);">
+            {% for a in acessos %}
+              <li>{{ a.acedido_em.strftime('%d/%m/%Y %H:%M:%S') }} — {{ a.nome }} (@{{ a.username }})</li>
+            {% endfor %}
+          </ul>
+        </section>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

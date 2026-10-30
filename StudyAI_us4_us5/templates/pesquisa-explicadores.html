@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pesquisa de Explicadores — StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="admin-page">
+  {% from '_icones.html' import icone, logotipo %}
+
+  <div class="admin-layout">
+    {% set ativo = 'pesquisa' %}
+    {% include '_sidebar.html' %}
+
+    <div class="main-content">
+      <header class="top-header">
+        <h1>Pesquisa de Explicadores</h1>
+      </header>
+
+      <main class="admin-container">
+        <!-- Formulário de Filtros -->
+        <section class="card" style="margin-bottom: 24px;">
+          <h2>Filtros de Pesquisa</h2>
+          <form method="GET" action="{{ url_for('pesquisar_explicadores') }}" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; align-items: flex-end;">
+            
+            <div class="form-group" style="margin: 0;">
+              <label for="disciplina">Disciplina</label>
+              <select id="disciplina" name="disciplina">
+                <option value="">Todas as disciplinas</option>
+                {% for d in disciplinas %}
+                  <option value="{{ d.codigo }}" {% if disciplina_filtro == d.codigo %}selected{% endif %}>{{ d.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="form-group" style="margin: 0;">
+              <label for="nivel">Nível de Escolaridade</label>
+              <select id="nivel" name="nivel">
+                <option value="">Todos os níveis</option>
+                {% for valor, nome in niveis_escolaridade %}
+                <option value="{{ valor }}" {% if nivel_filtro == valor %}selected{% endif %}>{{ nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="form-group" style="margin: 0;">
+              <label for="modalidade">Modalidade</label>
+              <select id="modalidade" name="modalidade">
+                <option value="">Todas as modalidades</option>
+                <option value="presencial" {% if modalidade_filtro == 'presencial' %}selected{% endif %}>Presencial</option>
+                <option value="online" {% if modalidade_filtro == 'online' %}selected{% endif %}>Online</option>
+                <option value="ambas" {% if modalidade_filtro == 'ambas' %}selected{% endif %}>Ambas</option>
+              </select>
+            </div>
+
+            <button type="submit" class="btn" style="height: 50px;">Filtrar</button>
+          </form>
+        </section>
+
+        <!-- Resultados da Pesquisa -->
+        <section class="card">
+          <h2>Resultados ({{ explicadores|length }})</h2>
+          {% for exp in explicadores %}
+          <article style="display: flex; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--line);">
+            {% if exp.fotografia_url %}
+              <img src="{{ url_for('ver_fotografia', id_utilizador=exp.id_utilizador) }}" alt="Fotografia de {{ exp.nome }}"
+                   style="width: 72px; height: 72px; object-fit: cover; border-radius: 50%; border: 2px solid var(--line); flex-shrink: 0;" />
+            {% else %}
+              <div style="width: 72px; height: 72px; border-radius: 50%; background: var(--cream); display: flex; align-items: center; justify-content: center; color: var(--orange-600); flex-shrink: 0;">{{ icone('explicador', 30) }}</div>
+            {% endif %}
+            <div>
+              <h3 style="margin: 0 0 4px;">{{ exp.nome }}</h3>
+              <p style="margin: 0 0 4px; color: var(--muted); font-size: 0.9rem;">
+                {{ (exp.modalidade or '-')|capitalize }}{% if exp.localidade %} · {{ exp.localidade }}{% endif %}
+              </p>
+              {% set niveis = niveis_por_explicador.get(exp.id_utilizador, []) %}
+              {% if niveis %}<p style="margin: 0 0 4px; font-size: 0.9rem;"><strong>Níveis:</strong> {% for n in niveis %}{{ n|nome_nivel }}{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+              {% set discs = disciplinas_por_explicador.get(exp.id_utilizador, []) %}
+              {% if discs %}<p style="margin: 0 0 4px; font-size: 0.9rem;"><strong>Disciplinas:</strong> {{ discs|join(', ') }}</p>{% endif %}
+              {% if exp.biografia %}<p style="margin: 0 0 4px; font-size: 0.9rem;">{{ exp.biografia }}</p>{% endif %}
+              {% if exp.habilitacoes %}<p style="margin: 0; font-size: 0.9rem;"><strong>Habilitações:</strong> {{ exp.habilitacoes }}</p>{% endif %}
+            </div>
+          </article>
+          {% else %}
+          <p style="color: var(--muted);">Nenhum explicador encontrado com estes filtros.</p>
+          {% endfor %}
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+</body>
+</html>

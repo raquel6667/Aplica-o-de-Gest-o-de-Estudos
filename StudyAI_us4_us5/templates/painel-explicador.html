@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Área Pessoal — Explicador StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="admin-page">
+  {% from '_icones.html' import icone, logotipo %}
+
+  <div class="admin-layout">
+    {% set ativo = 'perfil' %}
+    {% set bloqueado = utilizador.estado_conta != 'ativa' %}
+    {% include '_sidebar.html' %}
+
+    <div class="main-content">
+      <header class="top-header">
+        <h1>Área Pessoal de {{ utilizador.nome }} (Explicador)</h1>
+      </header>
+
+      {% with mensagens = get_flashed_messages(with_categories=true) %}
+        {% if mensagens %}
+        <div class="flash-area">
+          {% for categoria, texto in mensagens %}
+            <div class="flash {{ 'success' if categoria == 'success' else 'error' }}">{{ texto }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      {% endwith %}
+
+      <!-- Aviso de Validação do Administrador -->
+      {% if utilizador.estado_conta in ('pendente', 'rejeitada') %}<div class="flash-area">{% endif %}
+      {% if utilizador.estado_conta == 'pendente' %}
+        <div style="display: block; background: var(--warning-bg); border: 1px solid var(--warning-border); padding: 16px; border-radius: 12px; color: var(--warning);">
+          <strong>{{ icone('aviso', 16) }} Conta em validação:</strong> O teu registo de explicador está sob análise pelo Administrador. Não podes aceder a todas as funcionalidades até ser validado.
+        </div>
+      {% elif utilizador.estado_conta == 'rejeitada' %}
+        <div style="background: var(--danger-bg); border: 1px solid var(--danger-border); padding: 16px; border-radius: 12px; color: var(--danger);">
+          <strong>{{ icone('aviso', 16) }} Perfil rejeitado:</strong> {{ utilizador.motivo_rejeicao }}
+          <p style="margin: 8px 0 0 0; font-size: 0.9rem;">Podes atualizar as tuas informações abaixo e submeter novamente a conta para aprovação.</p>
+          <form action="{{ url_for('resubmeter_explicador') }}" method="POST" style="margin-top: 10px;">
+            <button type="submit" class="btn" style="background: var(--orange-700); border-color: var(--orange-700);">Re-submeter Conta para Validação</button>
+          </form>
+        </div>
+      {% endif %}
+      {% if utilizador.estado_conta in ('pendente', 'rejeitada') %}</div>{% endif %}
+
+      <main class="admin-container grade-perfil">
+        <!-- Consulta de Dados -->
+        <section class="card">
+          <h2>Dados Pessoais (Explicador)</h2>
+          {% if utilizador.fotografia_url %}
+            <div class="foto-perfil">
+              <img src="{{ url_for('ver_fotografia', id_utilizador=utilizador.id_utilizador) }}" alt="Fotografia de perfil"
+                   style="width: 96px; height: 96px; object-fit: cover; border-radius: 50%; border: 2px solid var(--line);" />
+              <form action="{{ url_for('remover_fotografia') }}" method="POST"
+                    onsubmit="return confirm('Remover a tua fotografia de perfil?');">
+                <button type="submit" class="btn-action delete" style="width: auto; padding: 0 14px;">Remover fotografia</button>
+              </form>
+            </div>
+          {% endif %}
+          <p><strong>Nome:</strong> {{ utilizador.nome }}</p>
+          <p><strong>Username:</strong> {{ utilizador.username }}</p>
+          <p><strong>E-mail:</strong> {{ utilizador.email }}</p>
+          <p><strong>Estado da Conta:</strong> <span style="text-transform: capitalize; font-weight: bold;">{{ utilizador.estado_conta }}</span></p>
+          <p><strong>Data de Nascimento:</strong> {{ utilizador.data_nascimento or 'Não indicada' }}</p>
+          <p><strong>Localização:</strong> {{ utilizador.localizacao or 'Não indicada' }}</p>
+          <p><strong>Modalidade:</strong> {{ explicador.modalidade or 'Não indicada' }}</p>
+          <p><strong>Localidade:</strong> {{ explicador.localidade or 'Não indicada' }}</p>
+          <p><strong>Níveis que leciono:</strong>
+            {% if niveis_selecionados %}{% for n in niveis_selecionados %}{{ n|nome_nivel }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}Não indicados{% endif %}
+          </p>
+          <p><strong>Apresentação / Bio:</strong> {{ explicador.biografia or 'Não indicada' }}</p>
+          <p><strong>Habilitações:</strong> {{ explicador.habilitacoes or 'Não indicadas' }}</p>
+
+          <h3 style="font-size: 1.05rem; margin: 18px 0 8px;">{{ icone('anexo', 16) }} Documentos de habilitações</h3>
+          {% if documentos %}
+            <ul style="list-style: none; padding: 0; margin: 0 0 12px;">
+              {% for doc in documentos %}
+              <li style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line);">
+                <span>
+                  <a href="{{ url_for('ver_documento_habilitacao', id_documento=doc.id) }}" target="_blank" rel="noopener">{{ doc.nome_original }}</a>
+                  <small style="color: var(--muted);"> · {{ (doc.tamanho / 1024)|round|int }} KB · {{ doc.criado_em.strftime('%Y-%m-%d') if doc.criado_em else '' }}</small>
+                </span>
+                <form action="{{ url_for('remover_documento_habilitacao') }}" method="POST" onsubmit="return confirm('Remover este documento?');">
+                  <input type="hidden" name="id_documento" value="{{ doc.id }}">
+                  <button type="submit" class="btn-action delete" style="width: auto;">Remover</button>
+                </form>
+              </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p style="color: var(--muted);">Ainda não enviaste nenhum documento.</p>
+          {% endif %}
+
+          <form action="{{ url_for('enviar_documentos_habilitacoes') }}" method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+              <label for="documentos_habilitacoes">Adicionar documentos (diplomas, certificados)</label>
+              <input type="file" id="documentos_habilitacoes" name="documentos_habilitacoes" multiple accept=".pdf,.png,.jpg,.jpeg" required />
+              <small style="display:block; margin-top:6px; color: var(--muted);">PDF, PNG ou JPG. Máx. 5 documentos de cada vez, 5 MB cada.</small>
+            </div>
+            <button type="submit" class="btn">Enviar documentos</button>
+          </form>
+
+          <hr style="border: 0; border-top: 1px solid var(--line); margin: 24px 0;" />
+          
+          <h3 style="color: var(--warning); font-size: 1.1rem; margin-bottom: 10px;">Zona de Perigo</h3>
+          <form action="{{ url_for('eliminar_conta') }}" method="POST" onsubmit="return confirm('Tens a certeza que pretendes eliminar a tua conta? Esta ação é irreversível.');">
+            <button type="submit" class="btn-action delete" style="width: 100%; min-height: 44px;">Eliminar Conta</button>
+          </form>
+        </section>
+
+        <!-- Formulário de Edição -->
+        <section class="card">
+          <h2>Editar Perfil</h2>
+          <form action="{{ url_for('editar_perfil') }}" method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+              <label for="nome">Nome Completo</label>
+              <input type="text" id="nome" name="nome" value="{{ utilizador.nome }}" required />
+            </div>
+            <div class="form-group">
+              <label for="email">E-mail</label>
+              <input type="email" id="email" name="email" value="{{ utilizador.email }}" required />
+            </div>
+            <div class="form-group">
+              <label for="data_nascimento">Data de Nascimento</label>
+              <input type="date" id="data_nascimento" name="data_nascimento" value="{{ utilizador.data_nascimento or '' }}" />
+            </div>
+            <div class="form-group">
+              <label for="localizacao">Localização</label>
+              <input type="text" id="localizacao" name="localizacao" maxlength="100" value="{{ utilizador.localizacao or '' }}" />
+            </div>
+            <div class="form-group">
+              <label for="fotografia">Fotografia de perfil (PNG ou JPG, máx. 2 MB)</label>
+              <input type="file" id="fotografia" name="fotografia" accept=".png,.jpg,.jpeg" />
+            </div>
+            <div class="form-group">
+              <label for="modalidade">Modalidade</label>
+              <select id="modalidade" name="modalidade">
+                <option value="presencial" {% if explicador.modalidade == 'presencial' %}selected{% endif %}>Presencial</option>
+                <option value="online" {% if explicador.modalidade == 'online' %}selected{% endif %}>Online</option>
+                <option value="ambas" {% if explicador.modalidade == 'ambas' %}selected{% endif %}>Ambas</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="localidade">Localidade</label>
+              <input type="text" id="localidade" name="localidade" value="{{ explicador.localidade or '' }}" />
+            </div>
+            <div class="form-group">
+              <label>Níveis de escolaridade que lecionas</label>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px 16px;">
+                {% for valor, nome in niveis_escolaridade %}
+                <label style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+                  <input type="checkbox" name="niveis" value="{{ valor }}" {% if valor in niveis_selecionados %}checked{% endif %} /> {{ nome }}
+                </label>
+                {% endfor %}
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="biografia">Apresentação / Biografia</label>
+              <textarea id="biografia" name="biografia" rows="3">{{ explicador.biografia or '' }}</textarea>
+            </div>
+            <div class="form-group">
+              <label for="habilitacoes">Habilitações Literárias e Qualificações</label>
+              <textarea id="habilitacoes" name="habilitacoes" rows="3" placeholder="Ex: Licenciatura em Matemática, Mestrado em Ensino...">{{ explicador.habilitacoes or '' }}</textarea>
+            </div>
+            <div class="form-group">
+              <label for="nova_password">Nova Palavra-passe (opcional)</label>
+              <input type="password" id="nova_password" name="nova_password" minlength="6" placeholder="Deixa em branco se não pretenderes alterar" />
+            </div>
+            <button type="submit" class="btn">Guardar Alterações</button>
+          </form>
+        </section>
+      </main>
+    </div>
+  </div>
+
+</body>
+</html>

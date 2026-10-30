@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Conversa com {{ outro.nome }} — StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="admin-page">
+  {% from '_icones.html' import icone, logotipo %}
+  {% set ativo = 'conversas' %}
+  <div class="admin-layout">
+    {% include '_sidebar.html' %}
+
+    <div class="main-content">
+      <header class="top-header">
+        <h1>{{ outro.nome }}</h1>
+      </header>
+
+      {% include '_flash.html' %}
+
+      <main class="admin-container">
+        <section class="card" style="margin-bottom: 24px;">
+          <p style="margin-top: 0;"><a class="link-voltar" href="{{ url_for('conversas') }}">{{ icone('voltar', 16) }} Todas as conversas</a>
+            {% if not outro.conta_eliminada %}<span style="color: var(--muted);"> · @{{ outro.username }} · {{ outro.tipo.capitalize() }}</span>{% endif %}
+          </p>
+          <p id="aviso" style="color: var(--warning); font-weight: 700;" {% if not aviso %}hidden{% endif %}>{{ aviso or '' }}</p>
+
+          <div class="chat-caixa">
+            <div class="chat-mensagens" id="mensagens" aria-live="polite">
+              <p class="chat-vazio" id="vazio" {% if mensagens %}hidden{% endif %}>Ainda não há mensagens nesta conversa.</p>
+            </div>
+            <form class="chat-form" id="form-mensagem" {% if not pode_enviar %}hidden{% endif %}>
+              <label class="btn-action edit chat-anexo" title="Anexar ficheiro ({{ formatos_chat }}, até {{ max_ficheiro // (1024 * 1024) }} MB)">
+                {{ icone('anexo', 20) }}<span class="sr-only">Anexar ficheiro</span>
+                <input type="file" id="ficheiro" name="ficheiro" accept="{% for e in extensoes_chat %}.{{ e }}{% if not loop.last %},{% endif %}{% endfor %}" hidden>
+              </label>
+              <textarea id="texto" name="texto" maxlength="{{ max_mensagem }}" placeholder="Escreve uma mensagem…" aria-label="Mensagem"></textarea>
+              <button type="submit" class="btn">Enviar</button>
+            </form>
+            <p id="anexo-escolhido" class="chat-anexo-escolhido" hidden></p>
+            <p id="erro" style="color: var(--danger); font-weight: 700;" hidden></p>
+            <p style="color: var(--muted); font-size: 0.8rem; margin: 6px 0 0;">Ficheiros: {{ formatos_chat }} (máx. {{ max_ficheiro // (1024 * 1024) }} MB).</p>
+          </div>
+        </section>
+
+        <section class="card" style="margin-bottom: 24px;">
+          <h2>Ficheiros partilhados</h2>
+          <p id="sem-ficheiros" style="color: var(--muted);">Ainda não foram partilhados ficheiros nesta conversa.</p>
+          <ul class="lista-pessoas" id="lista-ficheiros"></ul>
+        </section>
+
+        {% if pode_reclamar %}
+        <section class="card">
+          <details>
+            <summary style="cursor: pointer; font-weight: 800; color: var(--danger); display: inline-flex; align-items: center; gap: 6px;">{{ icone('aviso', 16) }} Reclamar desta conversa</summary>
+            <p style="color: var(--muted); font-size: 0.9rem;">
+              O Administrador passa a poder ler esta conversa (só leitura, incluindo os ficheiros) para avaliar o comportamento de {{ outro.nome }}.
+            </p>
+            <form action="{{ url_for('reclamar_conversa', id_outro=outro.id_utilizador) }}" method="POST">
+              <div class="form-group">
+                <label for="motivo">Motivo *</label>
+                <textarea id="motivo" name="motivo" maxlength="1000" required placeholder="Descreve o que aconteceu"></textarea>
+              </div>
+              <button type="submit" class="btn-action delete" style="width: auto; padding: 0 20px; min-height: 44px;">Enviar reclamação</button>
+            </form>
+          </details>
+        </section>
+        {% endif %}
+      </main>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var urlMensagens = "{{ url_for('conversa_mensagens', id_outro=outro.id_utilizador) }}";
+      var EXTENSOES = {{ extensoes_chat|tojson }};
+      var MAX_FICHEIRO = {{ max_ficheiro }};
+      var caixa = document.getElementById("mensagens");
+      var vazio = document.getElementById("vazio");
+      var form = document.getElementById("form-mensagem");
+      var texto = document.getElementById("texto");
+      var inputFicheiro = document.getElementById("ficheiro");
+      var anexoEscolhido = document.getElementById("anexo-escolhido");
+      var listaFicheiros = document.getElementById("lista-ficheiros");
+      var semFicheiros = document.getElementById("sem-ficheiros");
+      var erro = document.getElementById("erro");
+      var aviso = document.getElementById("aviso");
+      var ultimoId = 0;
+      var vistos = {};
+
+      function tamanhoLegivel(bytes) {
+        return bytes < 1024 * 1024 ? Math.max(1, Math.round(bytes / 1024)) + " KB" : (bytes / (1024 * 1024)).toFixed(1).replace(".", ",") + " MB";
+      }
+
+      function ligacao(url, textoLigacao, descarregar) {
+        var a = document.createElement("a");
+        a.href = url + (descarregar ? "?descarregar=1" : "");
+        a.textContent = textoLigacao;
+        if (!descarregar) { a.target = "_blank"; a.rel = "noopener"; }
+        return a;
+      }
+
+      // Secção de ficheiros: o mais recente fica em cima.
+      function juntarFicheiro(m) {
+        var f = m.ficheiro;
+        var li = document.createElement("li");
+        var pessoa = document.createElement("div");
+        pessoa.className = "pessoa";
+        var nome = document.createElement("strong");
+        nome.textContent = f.nome;
+        var info = document.createElement("small");
+        info.textContent = f.extensao.toUpperCase() + " · " + tamanhoLegivel(f.tamanho) + " · " + (m.meu ? "enviado por ti" : "recebido") + " a " + m.hora;
+        pessoa.appendChild(nome);
+        pessoa.appendChild(info);
+        var acoes = document.createElement("div");
+        acoes.className = "acoes";
+        var abrir = ligacao(f.url, "Abrir", false);
+        var guardar = ligacao(f.url, "Descarregar", true);
+        abrir.className = guardar.className = "btn-action edit";
+        acoes.appendChild(abrir);
+        acoes.appendChild(guardar);
+        li.appendChild(pessoa);
+        li.appendChild(acoes);
+        listaFicheiros.insertBefore(li, listaFicheiros.firstChild);
+        semFicheiros.hidden = true;
+      }
+
+      function mostrar(m) {
+        if (vistos[m.id]) return;
+        vistos[m.id] = true;
+        ultimoId = Math.max(ultimoId, m.id);
+        var noFundo = caixa.scrollHeight - caixa.scrollTop - caixa.clientHeight < 60;
+        var div = document.createElement("div");
+        div.className = "chat-msg" + (m.meu ? " meu" : "");
+        if (m.ficheiro) {
+          var bloco = document.createElement("div");
+          bloco.className = "chat-ficheiro";
+          if (m.ficheiro.imagem) {
+            var img = document.createElement("img");
+            img.src = m.ficheiro.url;
+            img.alt = m.ficheiro.nome;
+            img.loading = "lazy";
+            bloco.appendChild(img);
+          }
+          bloco.appendChild(ligacao(m.ficheiro.url, m.ficheiro.nome + " (" + tamanhoLegivel(m.ficheiro.tamanho) + ")", false));
+          bloco.appendChild(document.createTextNode(" · "));
+          bloco.appendChild(ligacao(m.ficheiro.url, "Descarregar", true));
+          div.appendChild(bloco);
+          juntarFicheiro(m);
+        }
+        if (m.texto) {
+          var corpo = document.createElement("span");
+          corpo.textContent = m.texto;          // textContent: o texto nunca é interpretado como HTML
+          div.appendChild(corpo);
+        }
+        var hora = document.createElement("time");
+        hora.textContent = m.hora;
+        div.appendChild(hora);
+        caixa.appendChild(div);
+        vazio.hidden = true;
+        if (noFundo || m.meu) caixa.scrollTop = caixa.scrollHeight;
+      }
+
+      {{ mensagens|tojson }}.forEach(mostrar);
+      caixa.scrollTop = caixa.scrollHeight;
+
+      // Tempo real por polling: pergunta ao servidor por mensagens novas a cada segundo.
+      var aPedir = false;
+      function atualizar() {
+        if (aPedir || document.hidden) return;
+        aPedir = true;
+        fetch(urlMensagens + "?depois=" + ultimoId, { headers: { "Accept": "application/json" } })
+          .then(function (r) { return r.json(); })
+          .then(function (dados) {
+            if (dados.erro) { aviso.textContent = dados.erro; aviso.hidden = false; form.hidden = true; return; }
+            dados.mensagens.forEach(mostrar);
+            form.hidden = !dados.pode_enviar;
+            aviso.textContent = dados.aviso || "";
+            aviso.hidden = !dados.aviso;
+          })
+          .catch(function () {})
+          .finally(function () { aPedir = false; });
+      }
+      setInterval(atualizar, 1000);
+      document.addEventListener("visibilitychange", atualizar);
+
+      function mostrarErro(mensagem) { erro.textContent = mensagem; erro.hidden = !mensagem; }
+
+      // Validação antes de enviar (o servidor volta a validar tipo, conteúdo e tamanho).
+      inputFicheiro.addEventListener("change", function () {
+        var f = inputFicheiro.files[0];
+        mostrarErro("");
+        anexoEscolhido.hidden = true;
+        if (!f) return;
+        var extensao = f.name.indexOf(".") >= 0 ? f.name.split(".").pop().toLowerCase() : "";
+        if (EXTENSOES.indexOf(extensao) < 0) {
+          mostrarErro("O ficheiro \"" + f.name + "\" não é permitido. Formatos aceites: {{ formatos_chat }}.");
+          inputFicheiro.value = "";
+        } else if (f.size > MAX_FICHEIRO) {
+          mostrarErro("O ficheiro \"" + f.name + "\" excede o limite de " + (MAX_FICHEIRO / (1024 * 1024)) + " MB.");
+          inputFicheiro.value = "";
+        } else {
+          anexoEscolhido.textContent = "Anexo: " + f.name + " (" + tamanhoLegivel(f.size) + ") — carrega em Enviar. ";
+          var tirar = document.createElement("button");
+          tirar.type = "button";
+          tirar.textContent = "Remover";
+          tirar.className = "btn-action delete";
+          tirar.addEventListener("click", function () { inputFicheiro.value = ""; anexoEscolhido.hidden = true; });
+          anexoEscolhido.appendChild(tirar);
+          anexoEscolhido.hidden = false;
+        }
+      });
+
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var conteudo = texto.value.trim();
+        var ficheiro = inputFicheiro.files[0];
+        if (!conteudo && !ficheiro) return;
+        var dadosForm = new FormData();
+        dadosForm.append("texto", conteudo);
+        if (ficheiro) dadosForm.append("ficheiro", ficheiro);
+        var botao = form.querySelector("button[type=submit]");
+        botao.disabled = true;
+        mostrarErro("");
+        fetch(urlMensagens, { method: "POST", body: dadosForm })
+          .then(function (r) { return r.json(); })
+          .then(function (dados) {
+            if (dados.erro) { mostrarErro(dados.erro); return; }
+            mostrar(dados.mensagem);
+            texto.value = "";
+            inputFicheiro.value = "";
+            anexoEscolhido.hidden = true;
+          })
+          .catch(function () { mostrarErro("Não foi possível enviar. Tenta novamente."); })
+          .finally(function () { botao.disabled = false; texto.focus(); });
+      });
+
+      texto.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); }
+      });
+    })();
+  </script>
+</body>
+</html>

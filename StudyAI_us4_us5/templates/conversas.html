@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Conversas — StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="admin-page">
+  {% set ativo = 'conversas' %}
+  <div class="admin-layout">
+    {% include '_sidebar.html' %}
+
+    <div class="main-content">
+      <header class="top-header">
+        <h1>Conversas</h1>
+      </header>
+
+      {% include '_flash.html' %}
+
+      <main class="admin-container">
+        <section class="card">
+          <h2>As minhas conversas</h2>
+          <p style="color: var(--muted); font-size: 0.9rem;">
+            Podes conversar com os teus amigos e, entre Estudante e Explicador, depois de um pedido de sessão.
+            {% if session.papel == 'explicador' %}Com quem não é teu amigo, só podes responder depois de o Estudante escrever.{% endif %}
+          </p>
+          {% if conversas %}
+            <ul class="lista-pessoas">
+              {% for c in conversas %}
+              <li>
+                <div class="pessoa">
+                  <strong>
+                    {{ c.outro.nome }}
+                    {% if not c.outro.conta_eliminada %}<span class="etiqueta-tipo">{{ c.outro.tipo.capitalize() }}</span>{% endif %}
+                    {% if c.nao_lidas %}<span class="badge-menu" style="display: inline-block; margin-left: 6px;" title="Mensagens não lidas">{{ c.nao_lidas }}</span>{% endif %}
+                  </strong>
+                  <small>
+                    {% if c.ultima %}
+                      {% if c.ultima.id_autor == session.utilizador_id %}Tu: {% endif %}{{ c.ultima.texto|truncate(80) }} · {{ c.ultima.enviada_em.strftime('%d/%m/%Y %H:%M') }}
+                    {% else %}
+                      Ainda sem mensagens.
+                    {% endif %}
+                  </small>
+                </div>
+                <div class="acoes">
+                  <a href="{{ url_for('conversa', id_outro=c.outro.id_utilizador) }}" class="btn-action edit">Abrir</a>
+                </div>
+              </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p style="color: var(--muted);">Ainda não tens conversas. Adiciona amigos em <a href="{{ url_for('amigos') }}">Amigos</a>{% if session.papel == 'estudante' %} ou pede uma sessão a um Explicador{% endif %}.</p>
+          {% endif %}
+        </section>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

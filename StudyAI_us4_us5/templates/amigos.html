@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Amigos — StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="admin-page">
+  {% from '_icones.html' import icone, logotipo %}
+  {% set ativo = 'amigos' %}
+  <div class="admin-layout">
+    {% include '_sidebar.html' %}
+
+    <div class="main-content">
+      <header class="top-header">
+        <h1>Amigos</h1>
+      </header>
+
+      {% include '_flash.html' %}
+
+      <main class="admin-container">
+        <section class="card" style="margin-bottom: 24px;">
+          <h2>Pesquisar utilizadores</h2>
+          <form method="GET" action="{{ url_for('amigos') }}" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;">
+            <div class="form-group" style="margin: 0; flex: 1 1 220px;">
+              <label for="q">Username</label>
+              <input type="search" id="q" name="q" value="{{ termo }}" maxlength="20" placeholder="Ex.: maria.silva" required />
+            </div>
+            <button type="submit" class="btn" style="height: 50px;">Pesquisar</button>
+          </form>
+
+          {% if resultados is not none %}
+            <div style="margin-top: 18px;">
+            {% if resultados %}
+              <ul class="lista-pessoas">
+                {% for u in resultados %}
+                <li>
+                  <div class="pessoa">
+                    <strong>{{ u.username }} <span class="etiqueta-tipo">{{ u.tipo.capitalize() }}</span></strong>
+                    <small>{{ u.nome }}</small>
+                  </div>
+                  <div class="acoes">
+                    {% if u.relacao == 'amigo' %}
+                      <span style="color: var(--success); font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">{{ icone('verificado', 16) }} Amigos</span>
+                      <a href="{{ url_for('conversa', id_outro=u.id_utilizador) }}" class="btn-action edit">Conversar</a>
+                    {% elif u.relacao == 'enviado' %}
+                      <span style="color: var(--muted); font-weight: 700;">Pedido enviado</span>
+                      <form action="{{ url_for('amigos_cancelar') }}" method="POST">
+                        <input type="hidden" name="id_amizade" value="{{ u.id_amizade }}"><input type="hidden" name="q" value="{{ termo }}">
+                        <button type="submit" class="btn-action delete">Cancelar pedido</button>
+                      </form>
+                    {% elif u.relacao == 'recebido' %}
+                      <form action="{{ url_for('amigos_aceitar') }}" method="POST">
+                        <input type="hidden" name="id_amizade" value="{{ u.id_amizade }}"><input type="hidden" name="q" value="{{ termo }}">
+                        <button type="submit" class="btn-action edit">Aceitar pedido</button>
+                      </form>
+                    {% else %}
+                      <form action="{{ url_for('amigos_pedir') }}" method="POST">
+                        <input type="hidden" name="id_utilizador" value="{{ u.id_utilizador }}"><input type="hidden" name="q" value="{{ termo }}">
+                        <button type="submit" class="btn-action edit">Adicionar amigo</button>
+                      </form>
+                    {% endif %}
+                  </div>
+                </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <p style="color: var(--muted);">Nenhum utilizador encontrado.</p>
+            {% endif %}
+            </div>
+          {% endif %}
+        </section>
+
+        <section class="card" style="margin-bottom: 24px;">
+          <h2>Pedidos recebidos {% if recebidos %}<span class="badge-menu" style="display: inline-block; margin-left: 8px;">{{ recebidos|length }}</span>{% endif %}</h2>
+          {% if recebidos %}
+            <ul class="lista-pessoas">
+              {% for p in recebidos %}
+              <li>
+                <div class="pessoa">
+                  <strong>{{ p.username }} <span class="etiqueta-tipo">{{ p.tipo.capitalize() }}</span></strong>
+                  <small>{{ p.nome }} · pedido de {{ p.criado_em.strftime('%d/%m/%Y %H:%M') }}</small>
+                </div>
+                <div class="acoes">
+                  <form action="{{ url_for('amigos_aceitar') }}" method="POST">
+                    <input type="hidden" name="id_amizade" value="{{ p.id }}">
+                    <button type="submit" class="btn-action edit">Aceitar</button>
+                  </form>
+                  <form action="{{ url_for('amigos_recusar') }}" method="POST">
+                    <input type="hidden" name="id_amizade" value="{{ p.id }}">
+                    <button type="submit" class="btn-action delete">Recusar</button>
+                  </form>
+                </div>
+              </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p style="color: var(--muted);">Não tens pedidos de amizade por responder.</p>
+          {% endif %}
+        </section>
+
+        <section class="card" style="margin-bottom: 24px;">
+          <h2>Pedidos enviados</h2>
+          {% if enviados %}
+            <ul class="lista-pessoas">
+              {% for p in enviados %}
+              <li>
+                <div class="pessoa">
+                  <strong>{{ p.username }} <span class="etiqueta-tipo">{{ p.tipo.capitalize() }}</span></strong>
+                  <small>{{ p.nome }} · enviado a {{ p.criado_em.strftime('%d/%m/%Y %H:%M') }}</small>
+                </div>
+                <div class="acoes">
+                  <form action="{{ url_for('amigos_cancelar') }}" method="POST">
+                    <input type="hidden" name="id_amizade" value="{{ p.id }}">
+                    <button type="submit" class="btn-action delete">Cancelar pedido</button>
+                  </form>
+                </div>
+              </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p style="color: var(--muted);">Não tens pedidos enviados à espera de resposta.</p>
+          {% endif %}
+        </section>
+
+        <section class="card">
+          <h2>Os meus amigos</h2>
+          {% if amigos %}
+            <ul class="lista-pessoas">
+              {% for a in amigos %}
+              <li>
+                <div class="pessoa">
+                  <strong>{{ a.username }} <span class="etiqueta-tipo">{{ a.tipo.capitalize() }}</span></strong>
+                  <small>{{ a.nome }}</small>
+                </div>
+                <div class="acoes">
+                  <a href="{{ url_for('conversa', id_outro=a.id_utilizador) }}" class="btn-action edit">Conversar</a>
+                  <form action="{{ url_for('amigos_remover') }}" method="POST"
+                        onsubmit="return confirm('Remover {{ a.username }} dos teus amigos? Se a vossa conversa só existia por serem amigos, deixa de estar acessível (o histórico fica guardado).');">
+                    <input type="hidden" name="id_utilizador" value="{{ a.id_utilizador }}">
+                    <button type="submit" class="btn-action delete">Remover</button>
+                  </form>
+                </div>
+              </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p style="color: var(--muted);">Ainda não tens amigos. Pesquisa um username acima para enviares um pedido.</p>
+          {% endif %}
+        </section>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Assistente Gemini — StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="admin-page">
+  {% from '_icones.html' import icone, logotipo %}
+  {% set ativo = 'assistente' %}
+  <div class="admin-layout">
+    {% include '_sidebar.html' %}
+
+    <div class="main-content">
+      <header class="top-header">
+        <h1>{{ icone('ia', 26) }} Assistente Gemini</h1>
+      </header>
+
+      {% include '_flash.html' %}
+
+      <main class="admin-container">
+        <section class="card ia-cartao">
+          <div class="ia-topo">
+            <a href="{{ url_for('lista_material') }}">{{ icone('voltar', 16) }} O meu material</a>
+            {% if configurado %}
+            <div class="ia-topo-acoes">
+              <span class="ia-contador" id="contador-mensagens" title="Mensagens enviadas ao Gemini hoje">{{ usadas }} / {{ max_mensagens }} mensagens hoje</span>
+              <button type="button" class="btn-action edit" id="nova-conversa">＋ Nova conversa</button>
+            </div>
+            {% endif %}
+          </div>
+
+          {% if not configurado %}
+            <p style="color: var(--warning); font-weight: 700;">O assistente Gemini não está configurado no servidor. Podes criar o material manualmente em
+              <a href="{{ url_for('lista_material') }}">O meu material</a>.</p>
+          {% else %}
+          <div class="ia-conversa" id="conversa" aria-live="polite">
+            <div class="ia-boas-vindas" id="boas-vindas">
+              <div class="ia-logo" aria-hidden="true">{{ icone('ia', 28) }}</div>
+              <h2>Olá, {{ session.username }}! Em que te posso ajudar a estudar?</h2>
+              <p>Pergunta o que quiseres sobre a matéria, cola um texto para eu resumir ou pede-me perguntas e flashcards.
+                 Quando eu criar material, podes guardá-lo para praticar.</p>
+              <div class="ia-sugestoes">
+                <button type="button" data-sugestao="Explica-me de forma simples o que são derivadas, com um exemplo.">{{ icone('disciplinas') }} Explica-me derivadas</button>
+                <button type="button" data-sugestao="Faz um resumo deste texto:&#10;&#10;">{{ icone('resumo') }} Resume um texto</button>
+                <button type="button" data-sugestao="Cria um questionário de 5 perguntas de escolha múltipla sobre ">{{ icone('questionario') }} Cria um questionário</button>
+                <button type="button" data-sugestao="Cria 10 flashcards para estudar ">{{ icone('flashcards') }} Cria flashcards</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="ia-consentimento" id="consentimento">
+            <label>
+              <input type="checkbox" id="aceito">
+              <span>{{ aviso_ia }} A conversa não fica guardada na plataforma.</span>
+            </label>
+          </div>
+
+          <form class="ia-escrever" id="form-ia">
+            <textarea id="mensagem" rows="1" maxlength="{{ max_texto }}" placeholder="Escreve ao Gemini…" aria-label="Mensagem para o Gemini"></textarea>
+            <button type="submit" class="ia-enviar" id="enviar" title="Enviar (Enter)" aria-label="Enviar">{{ icone('enviar', 18) }}</button>
+          </form>
+          <p class="ia-rodape"><span id="carateres">0 / {{ max_texto }}</span> · Enter para enviar, Shift+Enter para mudar de linha.
+            O Gemini pode enganar-se: confirma a informação importante.</p>
+
+          {% for nome in ('ia', 'resumo', 'questionario', 'flashcards', 'guardar', 'aviso') %}<template id="ic-{{ nome }}">{{ icone(nome, 16) }}</template>{% endfor %}
+          {# Formulário escondido: abre o material sugerido como rascunho editável, noutro separador (a conversa não se perde). #}
+          <form id="form-rascunho" method="POST" action="{{ url_for('rascunho_material') }}" target="_blank" hidden>
+            <input type="hidden" name="tipo"><input type="hidden" name="titulo">
+            <input type="hidden" name="conteudo"><input type="hidden" name="itens">
+          </form>
+          {% endif %}
+        </section>
+      </main>
+    </div>
+  </div>
+
+  {% if configurado %}
+  <script>
+    (function () {
+      var URL_MENSAGEM = "{{ url_for('assistente_mensagem') }}";
+      var MAX_TEXTO = {{ max_texto }};
+      var NOMES = { resumo: "Resumo", questionario: "Questionário", flashcards: "Flashcards" };
+      function ic(nome) { return document.getElementById("ic-" + nome).innerHTML; }   // SVG do próprio site
+      var conversa = document.getElementById("conversa");
+      var boasVindas = document.getElementById("boas-vindas");
+      var form = document.getElementById("form-ia");
+      var caixa = document.getElementById("mensagem");
+      var botaoEnviar = document.getElementById("enviar");
+      var aceito = document.getElementById("aceito");
+      var consentimento = document.getElementById("consentimento");
+      var contadorCarateres = document.getElementById("carateres");
+      var contadorMensagens = document.getElementById("contador-mensagens");
+      var historico = [];      // só em memória: ao sair da página a conversa desaparece
+      var aEsperar = false;
+
+      // ---------- Markdown simples e seguro: escapa tudo primeiro, depois só cria as etiquetas permitidas.
+      function escapar(t) {
+        return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+      }
+      function emLinha(t) {
+        return t.replace(/`([^`]+)`/g, "<code>$1</code>")
+                .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+                .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+      }
+      function markdown(texto) {
+        var linhas = escapar(texto).split("\n");
+        var html = [], lista = null, codigo = null;
+        function fecharLista() { if (lista) { html.push("</" + lista + ">"); lista = null; } }
+        linhas.forEach(function (l) {
+          if (/^```/.test(l)) {
+            if (codigo === null) { fecharLista(); codigo = []; } else { html.push("<pre><code>" + codigo.join("\n") + "</code></pre>"); codigo = null; }
+            return;
+          }
+          if (codigo !== null) { codigo.push(l); return; }
+          var m;
+          if ((m = l.match(/^(#{1,4})\s+(.*)$/))) { fecharLista(); html.push("<h4>" + emLinha(m[2]) + "</h4>"); }
+          else if ((m = l.match(/^\s*[-*•]\s+(.*)$/))) { if (lista !== "ul") { fecharLista(); html.push("<ul>"); lista = "ul"; } html.push("<li>" + emLinha(m[1]) + "</li>"); }
+          else if ((m = l.match(/^\s*\d+[.)]\s+(.*)$/))) { if (lista !== "ol") { fecharLista(); html.push("<ol>"); lista = "ol"; } html.push("<li>" + emLinha(m[1]) + "</li>"); }
+          else if (!l.trim()) { fecharLista(); }
+          else { fecharLista(); html.push("<p>" + emLinha(l) + "</p>"); }
+        });
+        fecharLista();
+        if (codigo !== null) html.push("<pre><code>" + codigo.join("\n") + "</code></pre>");
+        return html.join("");
+      }
+
+      function fundo() { conversa.scrollTop = conversa.scrollHeight; }
+
+      function bolha(papel) {
+        boasVindas.hidden = true;
+        var linha = document.createElement("div");
+        linha.className = "ia-linha " + (papel === "user" ? "ia-eu" : "ia-gemini");
+        if (papel !== "user") {
+          var avatar = document.createElement("div");
+          avatar.className = "ia-avatar";
+          avatar.innerHTML = ic("ia");
+          avatar.setAttribute("aria-hidden", "true");
+          linha.appendChild(avatar);
+        }
+        var corpo = document.createElement("div");
+        corpo.className = "ia-bolha";
+        linha.appendChild(corpo);
+        conversa.appendChild(linha);
+        return corpo;
+      }
+
+      function mostrarUtilizador(texto) {
+        var corpo = bolha("user");
+        corpo.textContent = texto;
+        fundo();
+      }
+
+      // Escreve a resposta aos poucos, como no Gemini.
+      function escreverAosPoucos(corpo, texto, depois) {
+        var reduzido = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        if (reduzido || texto.length > 4000) { corpo.innerHTML = markdown(texto); fundo(); depois(); return; }
+        var i = 0, passo = Math.max(2, Math.round(texto.length / 120));
+        (function tique() {
+          i = Math.min(texto.length, i + passo);
+          corpo.innerHTML = markdown(texto.slice(0, i));
+          fundo();
+          if (i < texto.length) setTimeout(tique, 16); else depois();
+        })();
+      }
+
+      function cartaoMaterial(corpo, material) {
+        var cartao = document.createElement("div");
+        cartao.className = "ia-material";
+        var titulo = document.createElement("div");
+        titulo.className = "ia-material-titulo";
+        var n = material.itens.length;
+        titulo.innerHTML = ic(material.tipo);
+        titulo.appendChild(document.createTextNode(" " + NOMES[material.tipo] + ": " + material.titulo +
+          (material.tipo === "questionario" ? " (" + n + " pergunta" + (n === 1 ? "" : "s") + ")" : "") +
+          (material.tipo === "flashcards" ? " (" + n + " cart" + (n === 1 ? "ão" : "ões") + ")" : "")));
+        cartao.appendChild(titulo);
+
+        // Resumo: mostra-se o texto. Questionário e flashcards: abrem logo em modo de prática,
+        // sem as respostas à vista (só aparecem ao corrigir ou ao virar o cartão).
+        var previa = document.createElement("div");
+        previa.className = "ia-material-previa";
+        if (material.tipo === "resumo") {
+          previa.innerHTML = markdown(material.conteudo);
+        } else if (material.tipo === "questionario") {
+          previa.classList.add("ia-pratica");
+          praticarQuestionario(previa, material.itens);
+        } else {
+          previa.classList.add("ia-pratica");
+          praticarFlashcards(previa, material.itens);
+        }
+        cartao.appendChild(previa);
+
+        var acoes = document.createElement("div");
+        acoes.className = "ia-material-acoes";
+        var guardar = document.createElement("button");
+        guardar.type = "button";
+        guardar.className = material.tipo === "resumo" ? "btn" : "btn-action";
+        guardar.innerHTML = ic("guardar") + (material.tipo === "resumo" ? " Rever e guardar no meu material" : " Guardar no meu material");
+        guardar.addEventListener("click", function () {
+          var f = document.getElementById("form-rascunho");
+          f.tipo.value = material.tipo;
+          f.titulo.value = material.titulo;
+          f.conteudo.value = material.conteudo || "";
+          f.itens.value = JSON.stringify(material.itens || []);
+          f.submit();
+        });
+        acoes.appendChild(guardar);
+        var dica = document.createElement("small");
+        dica.textContent = material.tipo === "resumo"
+          ? "Abre noutro separador para escolheres a disciplina e editares antes de guardar."
+          : "Abre noutro separador para editares e guardares (mostra as respostas — pratica primeiro!).";
+        acoes.appendChild(dica);
+        cartao.appendChild(acoes);
+        corpo.appendChild(cartao);
+        fundo();
+      }
+
+      var numeroPratica = 0;   // nomes únicos para os botões de rádio de cada questionário
+
+      // Questionário: escolhe-se as respostas e só ao "Corrigir" se vê a pontuação e as certas.
+      function praticarQuestionario(destino, perguntas) {
+        var form = document.createElement("form");
+        var id = "pratica-" + (numeroPratica++);
+        perguntas.forEach(function (p, i) {
+          var fs = document.createElement("fieldset");
+          fs.className = "pergunta-pratica";
+          var legenda = document.createElement("legend");
+          legenda.textContent = (i + 1) + ". " + p.enunciado;
+          fs.appendChild(legenda);
+          p.opcoes.forEach(function (o, j) {
+            var rotulo = document.createElement("label");
+            rotulo.className = "opcao-pratica";
+            rotulo.dataset.correta = o.correta ? "sim" : "nao";
+            var radio = document.createElement("input");
+            radio.type = "radio";
+            radio.name = id + "-" + i;
+            radio.value = j;
+            var texto = document.createElement("span");
+            texto.textContent = o.texto;
+            rotulo.appendChild(radio);
+            rotulo.appendChild(texto);
+            fs.appendChild(rotulo);
+          });
+          form.appendChild(fs);
+        });
+        var botoes = document.createElement("div");
+        botoes.className = "botoes-material";
+        var corrigir = document.createElement("button");
+        corrigir.type = "submit";
+        corrigir.className = "btn";
+        corrigir.textContent = "Corrigir";
+        var repetir = document.createElement("button");
+        repetir.type = "button";
+        repetir.className = "btn-action edit";
+        repetir.textContent = "Repetir";
+        repetir.hidden = true;
+        botoes.appendChild(corrigir);
+        botoes.appendChild(repetir);
+        form.appendChild(botoes);
+        var pontuacao = document.createElement("p");
+        pontuacao.className = "pontuacao";
+        pontuacao.setAttribute("role", "status");
+        pontuacao.hidden = true;
+        form.appendChild(pontuacao);
+
+        form.addEventListener("submit", function (e) {
+          e.preventDefault();
+          var certas = 0;
+          form.querySelectorAll(".pergunta-pratica").forEach(function (fs) {
+            var escolhida = fs.querySelector("input:checked");
+            fs.querySelectorAll(".opcao-pratica").forEach(function (o) {
+              var correta = o.dataset.correta === "sim";
+              o.classList.toggle("certa", correta);
+              o.classList.toggle("errada", !correta && o.contains(escolhida));
+              o.querySelector("input").disabled = true;
+            });
+            if (escolhida && escolhida.closest(".opcao-pratica").dataset.correta === "sim") certas++;
+            fs.classList.toggle("sem-resposta", !escolhida);
+          });
+          pontuacao.textContent = "Pontuação: " + certas + " de " + perguntas.length + " (" + Math.round(certas * 100 / perguntas.length) + "%). As respostas certas estão a verde.";
+          pontuacao.hidden = false;
+          corrigir.hidden = true;
+          repetir.hidden = false;
+        });
+        repetir.addEventListener("click", function () {
+          form.reset();
+          form.querySelectorAll(".opcao-pratica").forEach(function (o) {
+            o.classList.remove("certa", "errada");
+            o.querySelector("input").disabled = false;
+          });
+          form.querySelectorAll(".pergunta-pratica").forEach(function (fs) { fs.classList.remove("sem-resposta"); });
+          pontuacao.hidden = true;
+          repetir.hidden = true;
+          corrigir.hidden = false;
+        });
+        destino.appendChild(form);
+      }
+
+      // Flashcards: só a frente; o verso aparece ao virar o cartão.
+      function praticarFlashcards(destino, cartoes) {
+        var atual = 0, verso = false;
+        var cartao = document.createElement("div");
+        cartao.className = "flashcard";
+        cartao.tabIndex = 0;
+        cartao.setAttribute("role", "button");
+        cartao.setAttribute("aria-label", "Virar o cartão");
+        var lado = document.createElement("span");
+        lado.className = "flashcard-lado";
+        var texto = document.createElement("p");
+        var dica = document.createElement("small");
+        dica.style.color = "var(--text-3)";
+        dica.textContent = "Carrega no cartão para o virar.";
+        cartao.appendChild(lado);
+        cartao.appendChild(texto);
+        cartao.appendChild(dica);
+        var navegacao = document.createElement("div");
+        navegacao.className = "botoes-material";
+        navegacao.style.cssText = "justify-content: center; margin-top: 12px;";
+        var anterior = document.createElement("button");
+        anterior.type = "button";
+        anterior.className = "btn-action edit";
+        anterior.textContent = "← Anterior";
+        var posicao = document.createElement("span");
+        posicao.style.cssText = "font-weight: 700; color: var(--blue-800);";
+        var seguinte = document.createElement("button");
+        seguinte.type = "button";
+        seguinte.className = "btn-action edit";
+        seguinte.textContent = "Seguinte →";
+        navegacao.appendChild(anterior);
+        navegacao.appendChild(posicao);
+        navegacao.appendChild(seguinte);
+
+        function mostrar() {
+          var c = cartoes[atual];
+          texto.textContent = verso ? c.verso : c.frente;
+          lado.textContent = verso ? "Verso" : "Frente";
+          cartao.classList.toggle("virado", verso);
+          posicao.textContent = (atual + 1) + " / " + cartoes.length;
+          anterior.disabled = atual === 0;
+          seguinte.disabled = atual === cartoes.length - 1;
+        }
+        function virar() { verso = !verso; mostrar(); }
+        cartao.addEventListener("click", virar);
+        cartao.addEventListener("keydown", function (e) { if (e.key === " " || e.key === "Enter") { e.preventDefault(); virar(); } });
+        anterior.addEventListener("click", function () { if (atual > 0) { atual--; verso = false; mostrar(); } });
+        seguinte.addEventListener("click", function () { if (atual < cartoes.length - 1) { atual++; verso = false; mostrar(); } });
+        mostrar();
+        destino.appendChild(cartao);
+        destino.appendChild(navegacao);
+      }
+
+      function aEscrever() {
+        var corpo = bolha("model");
+        corpo.classList.add("ia-a-escrever");
+        corpo.innerHTML = '<span class="ia-pontos" role="status" aria-label="O Gemini está a escrever"><i></i><i></i><i></i></span>';
+        fundo();
+        return corpo;
+      }
+
+      function mostrarErro(corpo, mensagem, podeRepetir) {
+        corpo.classList.remove("ia-a-escrever");
+        corpo.classList.add("ia-erro");
+        corpo.textContent = mensagem + " ";
+        if (podeRepetir) {
+          var repetir = document.createElement("button");
+          repetir.type = "button";
+          repetir.className = "btn-action edit";
+          repetir.textContent = "Tentar novamente";
+          repetir.addEventListener("click", function () { corpo.parentNode.remove(); pedir(); });
+          corpo.appendChild(repetir);
+        }
+        fundo();
+      }
+
+      function atualizarContador(usadas, max) {
+        if (typeof usadas === "number") contadorMensagens.textContent = usadas + " / " + (max || {{ max_mensagens }}) + " mensagens hoje";
+      }
+
+      // Envia a conversa toda (o servidor não a guarda) e mostra a resposta.
+      function pedir() {
+        aEsperar = true;
+        botaoEnviar.disabled = true;
+        var corpo = aEscrever();
+        fetch(URL_MENSAGEM, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Accept": "application/json" },
+          body: JSON.stringify({ mensagens: historico, confirmar: aceito.checked })
+        })
+          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, dados: d }; }); })
+          .then(function (res) {
+            atualizarContador(res.dados.usadas, res.dados.max);
+            if (!res.ok) {
+              // A mensagem do utilizador sai do histórico para poder ser reenviada (ou corrigida).
+              mostrarErro(corpo, res.dados.erro || "Não foi possível gerar o conteúdo. Tente novamente.", res.status === 502);
+              if (res.status !== 502) historico.pop();
+              return;
+            }
+            historico.push({ papel: "model", texto: res.dados.resposta });
+            corpo.classList.remove("ia-a-escrever");
+            escreverAosPoucos(corpo, res.dados.resposta, function () {
+              if (res.dados.material) cartaoMaterial(corpo, res.dados.material);
+            });
+          })
+          .catch(function () { mostrarErro(corpo, "Não foi possível gerar o conteúdo. Tente novamente.", true); })
+          .finally(function () { aEsperar = false; botaoEnviar.disabled = false; caixa.focus(); });
+      }
+
+      function enviar() {
+        var texto = caixa.value.trim();
+        if (!texto || aEsperar) return;
+        if (!aceito.checked) {
+          consentimento.classList.add("ia-destaque");
+          aceito.focus();
+          return;
+        }
+        if (texto.length > MAX_TEXTO) return;
+        // Se a última resposta falhou, a pergunta pendente é substituída pela nova.
+        if (historico.length && historico[historico.length - 1].papel === "user") historico.pop();
+        historico.push({ papel: "user", texto: texto });
+        mostrarUtilizador(texto);
+        caixa.value = "";
+        ajustarCaixa();
+        pedir();
+      }
+
+      function ajustarCaixa() {
+        caixa.style.height = "auto";
+        caixa.style.height = Math.min(caixa.scrollHeight, 220) + "px";
+        contadorCarateres.textContent = caixa.value.length + " / " + MAX_TEXTO;
+      }
+
+      form.addEventListener("submit", function (e) { e.preventDefault(); enviar(); });
+      caixa.addEventListener("input", ajustarCaixa);
+      caixa.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviar(); }
+      });
+      aceito.addEventListener("change", function () {
+        consentimento.classList.remove("ia-destaque");
+        consentimento.classList.toggle("ia-aceite", aceito.checked);
+      });
+      document.querySelectorAll("[data-sugestao]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          caixa.value = b.dataset.sugestao;
+          ajustarCaixa();
+          caixa.focus();
+          caixa.setSelectionRange(caixa.value.length, caixa.value.length);
+        });
+      });
+      document.getElementById("nova-conversa").addEventListener("click", function () {
+        if (aEsperar) return;
+        historico = [];
+        conversa.querySelectorAll(".ia-linha").forEach(function (l) { l.remove(); });
+        boasVindas.hidden = false;
+        caixa.value = "";
+        ajustarCaixa();
+        caixa.focus();
+      });
+      window.addEventListener("beforeunload", function (e) {
+        if (historico.length) { e.preventDefault(); e.returnValue = ""; }   // avisa que a conversa se perde
+      });
+      ajustarCaixa();
+    })();
+  </script>
+  {% endif %}
+</body>
+</html>

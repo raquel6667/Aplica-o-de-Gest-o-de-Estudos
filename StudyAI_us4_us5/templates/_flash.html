@@ -1,0 +1,9 @@
+{% with mensagens = get_flashed_messages(with_categories=true) %}
+  {% if mensagens %}
+  <div class="flash-area">
+    {% for categoria, texto in mensagens %}
+      <div class="flash {{ 'success' if categoria == 'success' else 'error' }}">{{ texto }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% endwith %}

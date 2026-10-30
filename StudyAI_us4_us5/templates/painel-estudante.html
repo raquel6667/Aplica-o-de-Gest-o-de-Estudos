@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Área Pessoal — Estudante StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="admin-page">
+
+  <div class="admin-layout">
+    {% set ativo = 'perfil' %}
+    {% include '_sidebar.html' %}
+
+    <div class="main-content">
+      <header class="top-header">
+        <h1>Área Pessoal de {{ utilizador.nome }}</h1>
+      </header>
+
+      {% with mensagens = get_flashed_messages(with_categories=true) %}
+        {% if mensagens %}
+        <div class="flash-area">
+          {% for categoria, texto in mensagens %}
+            <div class="flash {{ 'success' if categoria == 'success' else 'error' }}">{{ texto }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      {% endwith %}
+
+      <main class="admin-container grade-perfil">
+        <!-- Consulta de Dados -->
+        <section class="card">
+          <h2>Dados Pessoais (Estudante)</h2>
+          {% if utilizador.fotografia_url %}
+            <div class="foto-perfil">
+              <img src="{{ url_for('ver_fotografia', id_utilizador=utilizador.id_utilizador) }}" alt="Fotografia de perfil"
+                   style="width: 96px; height: 96px; object-fit: cover; border-radius: 50%; border: 2px solid var(--line);" />
+              <form action="{{ url_for('remover_fotografia') }}" method="POST"
+                    onsubmit="return confirm('Remover a tua fotografia de perfil?');">
+                <button type="submit" class="btn-action delete" style="width: auto; padding: 0 14px;">Remover fotografia</button>
+              </form>
+            </div>
+          {% endif %}
+          <p><strong>Nome:</strong> {{ utilizador.nome }}</p>
+          <p><strong>Username:</strong> {{ utilizador.username }}</p>
+          <p><strong>E-mail:</strong> {{ utilizador.email }}</p>
+          <p><strong>Data de Nascimento:</strong> {{ utilizador.data_nascimento or 'Não indicada' }}</p>
+          <p><strong>Localização:</strong> {{ utilizador.localizacao or 'Não indicada' }}</p>
+          <p><strong>Instituição:</strong> {{ estudante.instituicao or 'Não indicada' }}</p>
+          <p><strong>Nível de Ensino:</strong> {{ (estudante.nivel_ensino|nome_nivel) or 'Não indicado' }}</p>
+
+          <hr style="border: 0; border-top: 1px solid var(--line); margin: 24px 0;" />
+          
+          <h3 style="color: var(--warning); font-size: 1.1rem; margin-bottom: 10px;">Zona de Perigo</h3>
+          <form action="{{ url_for('eliminar_conta') }}" method="POST" onsubmit="return confirm('Tens a certeza que pretendes eliminar a tua conta? Esta ação é irreversível.');">
+            <button type="submit" class="btn-action delete" style="width: 100%; min-height: 44px;">Eliminar Conta</button>
+          </form>
+        </section>
+
+        <!-- Formulário de Edição -->
+        <section class="card">
+          <h2>Editar Perfil</h2>
+          <form action="{{ url_for('editar_perfil') }}" method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+              <label for="nome">Nome Completo</label>
+              <input type="text" id="nome" name="nome" value="{{ utilizador.nome }}" required />
+            </div>
+            <div class="form-group">
+              <label for="email">E-mail</label>
+              <input type="email" id="email" name="email" value="{{ utilizador.email }}" required />
+            </div>
+            <div class="form-group">
+              <label for="data_nascimento">Data de Nascimento</label>
+              <input type="date" id="data_nascimento" name="data_nascimento" value="{{ utilizador.data_nascimento or '' }}" />
+            </div>
+            <div class="form-group">
+              <label for="localizacao">Localização</label>
+              <input type="text" id="localizacao" name="localizacao" value="{{ utilizador.localizacao or '' }}" />
+            </div>
+            <div class="form-group">
+              <label for="instituicao">Instituição de Ensino</label>
+              <input type="text" id="instituicao" name="instituicao" value="{{ estudante.instituicao or '' }}" />
+            </div>
+            <div class="form-group">
+              <label for="nivel_ensino">Nível de Ensino</label>
+              <select id="nivel_ensino" name="nivel_ensino">
+                <option value="">Seleciona o nível</option>
+                {% for valor, nome in niveis_escolaridade %}
+                <option value="{{ valor }}" {% if estudante.nivel_ensino == valor %}selected{% endif %}>{{ nome }}</option>
+                {% endfor %}
+                {% if estudante.nivel_ensino and not (estudante.nivel_ensino in niveis_escolaridade|map(attribute=0)|list) %}
+                <option value="{{ estudante.nivel_ensino }}" selected>{{ estudante.nivel_ensino|nome_nivel }} (antigo)</option>
+                {% endif %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="fotografia">Fotografia de perfil (PNG ou JPG, máx. 2 MB)</label>
+              <input type="file" id="fotografia" name="fotografia" accept=".png,.jpg,.jpeg" />
+            </div>
+            <div class="form-group">
+              <label for="nova_password">Nova Palavra-passe (opcional)</label>
+              <input type="password" id="nova_password" name="nova_password" minlength="6" placeholder="Deixa em branco se não pretenderes alterar" />
+            </div>
+            <button type="submit" class="btn">Guardar Alterações</button>
+          </form>
+        </section>
+
+ 
+
+      </main>
+    </div>
+  </div>
+
+</body>
+</html>

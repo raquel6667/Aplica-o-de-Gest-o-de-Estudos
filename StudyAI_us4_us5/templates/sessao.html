@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sessão de {{ s.nome_disciplina }} — StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="admin-page">
+  {% from '_icones.html' import icone, logotipo %}
+  {% set ativo = 'sessoes' %}
+  <div class="admin-layout">
+    {% include '_sidebar.html' %}
+
+    <div class="main-content">
+      <header class="top-header">
+        <h1>Sessão de {{ s.nome_disciplina }}</h1>
+      </header>
+
+      {% include '_flash.html' %}
+
+      <main class="admin-container grade-sessao">
+
+        <section class="card">
+          <h2>Detalhes</h2>
+          <p><strong>Disciplina:</strong> {{ s.nome_disciplina }}</p>
+          <p><strong>Data e hora:</strong> {{ s.data_hora.strftime('%d/%m/%Y às %H:%M') }} (duração: 1 hora)</p>
+          <p><strong>Modalidade:</strong> {{ s.modalidade.capitalize() }}</p>
+          {% if session.papel == 'estudante' %}
+            <p><strong>Explicador:</strong> {{ s.nome_explicador }}</p>
+          {% else %}
+            <p><strong>Estudante:</strong> {{ s.nome_estudante }}</p>
+          {% endif %}
+          {% if s.modalidade == 'presencial' and s.localidade %}
+            <p><strong>Localidade do Explicador:</strong> {{ s.localidade }}</p>
+          {% endif %}
+          <p><strong>Estado:</strong>
+            <span style="display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 800; background: var(--info-bg); color: var(--blue-800);">{{ s.estado|estado_sessao }}</span>
+          </p>
+
+          {% if estado_evento == 'sincronizado' %}
+            <p style="color: var(--muted); font-size: 0.9rem;">{{ icone('calendario', 16) }} Esta sessão está no teu Google Calendar.</p>
+          {% elif estado_evento == 'nao_sincronizado' %}
+            <p style="color: var(--warning); font-size: 0.9rem;">{{ icone('aviso', 16) }} Evento não sincronizado com o Google Calendar. <a href="{{ url_for('definicoes_calendario') }}">Ver definições</a></p>
+          {% endif %}
+
+          <a href="{{ url_for('conversa', id_outro=s.id_explicador if session.papel == 'estudante' else s.id_estudante) }}"
+             class="btn-action edit" style="width: auto; min-height: 44px; padding: 0 20px; margin-top: 18px; text-decoration: none;">
+            {{ icone('conversas', 16) }} Conversar com {% if session.papel == 'estudante' %}{{ s.nome_explicador }}{% else %}{{ s.nome_estudante }}{% endif %}
+          </a>
+
+          {% if pode_cancelar %}
+            <form action="{{ url_for('cancelar_sessao') }}" method="POST" style="margin-top: 18px;"
+                  onsubmit="return confirm('Tens a certeza que pretendes cancelar esta sessão?{% if transacao and transacao.estado == 'paga' %} O valor pago será reembolsado na totalidade.{% endif %}');">
+              <input type="hidden" name="id_sessao" value="{{ s.id }}">
+              <input type="hidden" name="origem" value="sessao">
+              <button type="submit" class="btn-action delete" style="min-height: 44px; padding: 0 20px;">Cancelar sessão</button>
+            </form>
+          {% endif %}
+        </section>
+
+        <section class="card">
+          <h2>Pagamento</h2>
+          {% if not transacao %}
+            <p style="color: var(--muted);">
+              {% if s.estado == 'pendente' %}O pagamento só fica disponível depois de o Explicador aceitar a sessão.
+              {% else %}Esta sessão não tem pagamento associado.{% endif %}
+            </p>
+          {% else %}
+            <p><strong>Valor:</strong> {{ transacao.valor|eur }}</p>
+            {% if session.papel == 'explicador' %}
+              <p><strong>Comissão da plataforma (10%):</strong> {{ transacao.comissao|eur }}</p>
+              <p><strong>Recebes:</strong> {{ transacao.valor_explicador|eur }}
+                {% if transacao.estado == 'paga' and transacao.paypal_payout_id %}<small style="color: var(--muted);">(repasse efetuado)</small>
+                {% elif transacao.estado == 'paga' %}<small style="color: var(--muted);">(o repasse é feito quando a sessão estiver concluída)</small>{% endif %}
+              </p>
+            {% endif %}
+            <p><strong>Estado:</strong>
+              <span style="display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 800;
+                {% if transacao.estado == 'paga' %}background:var(--success-bg);color:var(--success);{% elif transacao.estado == 'em_divida' %}background:var(--danger-bg);color:var(--danger);{% else %}background:var(--info-bg);color:var(--blue-800);{% endif %}">
+                {{ transacao.estado|estado_transacao }}
+              </span>
+            </p>
+
+            {% if session.papel == 'estudante' %}
+              {% if transacao.estado == 'em_divida' %}
+                <p style="color: var(--danger); font-weight: 700;">{{ icone('aviso', 16) }} O prazo de pagamento terminou. Não podes fazer novas marcações até pagares esta sessão.</p>
+              {% elif pode_pagar %}
+                <p style="color: var(--muted); font-size: 0.9rem;">Podes pagar até {{ prazo_pagamento.strftime('%d/%m/%Y às %H:%M') }}.</p>
+              {% endif %}
+              {% if pode_pagar %}
+                <form action="{{ url_for('pagar_sessao', id_sessao=s.id) }}" method="POST" style="margin-top: 14px;">
+                  <button type="submit" class="btn" style="min-height: 46px;">Pagar {{ transacao.valor|eur }} com PayPal</button>
+                </form>
+                <p style="color: var(--muted); font-size: 0.8rem; margin-top: 8px;">Serás redirecionado para o PayPal (ambiente de testes). A plataforma não guarda dados de pagamento.</p>
+              {% endif %}
+            {% endif %}
+          {% endif %}
+        </section>
+
+      </main>
+    </div>
+  </div>
+</body>
+</html>

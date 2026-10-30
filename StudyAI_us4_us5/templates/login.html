@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Iniciar Sessão — StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="login-page">
+  {% from '_icones.html' import icone, logotipo %}
+
+  <div class="login-container">
+    <a href="{{ url_for('landing_page') }}" style="text-decoration: none;">{{ logotipo(40) }}</a>
+    <h2>Bem-vindo de volta</h2>
+    <p class="subtitulo-login">Inicia sessão como Estudante ou Explicador.</p>
+
+    {% with mensagens = get_flashed_messages(with_categories=true) %}
+      {% if mensagens %}
+        {% for categoria, texto in mensagens %}
+          <div class="error-msg {% if categoria == 'success' %}flash-success{% else %}flash-error{% endif %}" style="margin-bottom: 20px;">
+            {{ texto }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% if mensagem_erro %}
+      <div id="errorBox" class="error-msg" style="margin-bottom: 20px;">
+        {{ mensagem_erro }}
+      </div>
+    {% endif %}
+
+    <form id="loginForm" action="{{ url_for('login') }}" method="POST">
+
+      <div class="form-group">
+        <label for="username">Nome de utilizador</label>
+        <input 
+          type="text" 
+          id="username" 
+          name="username" 
+          placeholder="O teu nome de utilizador" 
+          autocomplete="username" 
+          required
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Palavra-passe</label>
+        <input 
+          type="password" 
+          id="password" 
+          name="password" 
+          placeholder="A tua palavra-passe" 
+          autocomplete="current-password" 
+          required
+        />
+        <small class="dica-password">A palavra-passe tem no mínimo {{ min_password }} caracteres.</small>
+      </div>
+
+      <button type="submit" class="btn">Entrar</button>
+
+      <div style="text-align: center; margin-top: 22px; font-size: 0.9rem; display: flex; flex-direction: column; gap: 10px;">
+        <a href="{{ url_for('registar') }}" style="color: var(--orange-700); font-weight: 800; text-decoration: none;">Ainda não tens conta? Cria uma conta aqui</a>
+        <a href="{{ url_for('landing_page') }}" style="color: var(--muted); font-weight: 600; text-decoration: none; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">{{ icone('voltar', 16) }} Voltar à página inicial</a>
+      </div>
+    </form>
+  </div>
+
+  {% include '_palavra_passe.html' %}
+</body>
+</html>

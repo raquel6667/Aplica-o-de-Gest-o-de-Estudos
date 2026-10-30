@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dossiê de denúncia n.º {{ d.id }} — StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="admin-page">
+  {% from '_icones.html' import icone, logotipo %}
+  <div class="admin-layout">
+    {% set ativo = 'reclamacoes' %}
+    {% include '_sidebar_admin.html' %}
+
+    <div class="main-content">
+      <header class="top-header">
+        <h1>Dossiê de denúncia n.º {{ d.id }}</h1>
+      </header>
+
+      {% include '_flash.html' %}
+
+      <main class="admin-container dossie">
+        <div class="botoes-material nao-imprimir" style="margin-bottom: 18px;">
+          {% if r %}<a class="link-voltar" href="{{ url_for('admin_ver_reclamacao', id_reclamacao=r.id) }}">{{ icone('voltar', 16) }} Voltar à reclamação</a>{% endif %}
+          <button type="button" class="btn" style="width: auto;" onclick="window.print()">Imprimir / guardar em PDF</button>
+        </div>
+
+        <section class="card">
+          <div class="dossie-cabecalho">
+            {{ logotipo(32) }}
+            <div>
+              <strong>Dossiê de denúncia n.º {{ d.id }}</strong><br>
+              <small>Gerado a {{ gerado_em.strftime('%d/%m/%Y às %H:%M') }} · Documento confidencial</small>
+            </div>
+          </div>
+
+          <h2>1. Denúncia</h2>
+          <table class="tabela-dossie">
+            <tr><th>Data da denúncia</th><td>{{ d.criada_em.strftime('%d/%m/%Y às %H:%M') }}</td></tr>
+            <tr><th>Registada por</th><td>{{ d.admin_nome }} (@{{ d.admin_username }}), Administrador</td></tr>
+            <tr><th>Motivo</th><td style="white-space: pre-wrap;">{{ d.motivo }}</td></tr>
+          </table>
+
+          <h2>2. Conta denunciada</h2>
+          <table class="tabela-dossie">
+            <tr><th>Nome</th><td>{{ conta.nome }}{% if conta.conta_eliminada %} (conta eliminada){% endif %}</td></tr>
+            <tr><th>Username</th><td>@{{ conta.username }}</td></tr>
+            <tr><th>Tipo de conta</th><td>{{ conta.tipo|capitalize }}</td></tr>
+            {% if conta.email %}<tr><th>E-mail</th><td>{{ conta.email }}</td></tr>{% endif %}
+            <tr><th>Conta criada a</th><td>{{ conta.criado_em.strftime('%d/%m/%Y às %H:%M') }}</td></tr>
+            <tr><th>Estado atual</th><td>
+              {% if conta.conta_eliminada %}Eliminada{% elif conta.banida %}Banida{% elif conta.estado_conta == 'bloqueada' %}Bloqueada{% if conta.bloqueado_ate %} até {{ conta.bloqueado_ate.strftime('%d/%m/%Y %H:%M') }}{% endif %}{% else %}Ativa{% endif %}
+            </td></tr>
+          </table>
+
+          {% if r %}
+          <h2>3. Reclamação que deu origem à denúncia</h2>
+          <table class="tabela-dossie">
+            <tr><th>Reclamação</th><td>n.º {{ r.id }}, de {{ r.criada_em.strftime('%d/%m/%Y às %H:%M') }}</td></tr>
+            <tr><th>Feita por</th><td>{{ r.nome_autor }} (@{{ r.username_autor }})</td></tr>
+            <tr><th>Motivo</th><td style="white-space: pre-wrap;">{{ r.motivo }}</td></tr>
+          </table>
+
+          <h2>4. Conversa completa ({{ mensagens|length }} mensagem(ns))</h2>
+          <table class="tabela-dossie tabela-conversa">
+            <thead><tr><th>Data e hora</th><th>Autor</th><th>Mensagem / ficheiro</th></tr></thead>
+            <tbody>
+              {% for m in mensagens %}
+              <tr>
+                <td style="white-space: nowrap;">{{ m.enviada_em.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+                <td>{{ m.nome_autor }}<br><small>@{{ m.username_autor }}</small></td>
+                <td>
+                  {% if m.nome_original %}<em>Ficheiro: {{ m.nome_original }} ({{ m.extensao|upper }}, {{ (m.tamanho / 1024)|round(1) }} KB)</em><br>{% endif %}
+                  <span style="white-space: pre-wrap;">{{ m.texto }}</span>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="3">A conversa não tem mensagens.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <p class="dica-moderacao">Os ficheiros partilhados estão guardados na plataforma e podem ser descarregados na página da reclamação.</p>
+
+          <h2>5. Registo de acessos do Administrador à conversa</h2>
+          <ul>
+            {% for a in acessos %}<li>{{ a.acedido_em.strftime('%d/%m/%Y %H:%M:%S') }} — @{{ a.username }}</li>{% else %}<li>Sem acessos registados.</li>{% endfor %}
+          </ul>
+          {% endif %}
+
+          <h2>{{ '6' if r else '3' }}. Histórico de moderação da conta</h2>
+          <ul>
+            {% for h in historico %}
+              <li>{{ h.criada_em.strftime('%d/%m/%Y %H:%M') }} — {{ {'bloqueio': 'Bloqueio', 'banimento': 'Banimento', 'levantamento': 'Conta reativada', 'denuncia': 'Denúncia'}[h.tipo] }}{% if h.ate %} até {{ h.ate.strftime('%d/%m/%Y %H:%M') }}{% endif %} (@{{ h.admin }}): {{ h.motivo }}</li>
+            {% endfor %}
+          </ul>
+        </section>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,79 @@
+{# Menu lateral do Administrador. Antes de incluir: {% set ativo = 'transacoes' %}.
+   No painel principal ({% set abas = True %}) as três primeiras entradas trocam de separador sem sair da página. #}
+{% from '_icones.html' import icone, logotipo %}
+{% set abas = abas|default(False) %}
+
+{% macro aba(id_aba, nome, icon, primeira=False) -%}
+  {%- if abas -%}
+  <li><a href="#{{ id_aba }}" class="nav-item {% if primeira %}active{% endif %}" data-aba="{{ id_aba }}">{{ icone(icon) }}<span>{{ nome }}</span></a></li>
+  {%- else -%}
+  <li><a href="{{ url_for('painel_admin') }}#{{ id_aba }}" class="nav-item">{{ icone(icon) }}<span>{{ nome }}</span></a></li>
+  {%- endif -%}
+{%- endmacro %}
+
+<header class="barra-movel">
+  <button type="button" class="botao-menu" id="abrir-menu" aria-controls="menu-lateral" aria-expanded="false" aria-label="Abrir o menu">{{ icone('menu', 22) }}</button>
+  <a href="{{ url_for('painel_admin') }}" class="barra-movel-logo">{{ logotipo(30) }}</a>
+</header>
+<div class="sombra-menu" id="sombra-menu" hidden></div>
+
+<aside class="sidebar" id="menu-lateral" aria-label="Menu do Administrador">
+  <div class="sidebar-header">
+    <a href="{{ url_for('painel_admin') }}" class="sidebar-logo">{{ logotipo(34) }}</a>
+    <button type="button" class="botao-menu fechar-menu" id="fechar-menu" aria-label="Fechar o menu">{{ icone('fechar', 20) }}</button>
+  </div>
+  <nav class="sidebar-nav">
+    <p class="nav-secao">Gestão</p>
+    <ul>
+      {{ aba('tab-disciplinas', 'Disciplinas', 'disciplinas', True) }}
+      {{ aba('tab-explicadores', 'Explicadores', 'explicador') }}
+      {{ aba('tab-estudantes', 'Estudantes', 'estudante') }}
+    </ul>
+    <p class="nav-secao">Supervisão</p>
+    <ul>
+      <li><a href="{{ url_for('admin_transacoes') }}" class="nav-item {% if ativo == 'transacoes' %}active{% endif %}">{{ icone('transacoes') }}<span>Transações</span></a></li>
+      <li><a href="{{ url_for('admin_reclamacoes') }}" class="nav-item {% if ativo == 'reclamacoes' %}active{% endif %}">{{ icone('aviso') }}<span>Reclamações</span></a></li>
+    </ul>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="cartao-utilizador">
+      <span class="avatar-inicial" aria-hidden="true">{{ (session.username or 'A')[:1]|upper }}</span>
+      <span class="cartao-utilizador-texto"><strong>{{ session.username }}</strong><small>Administrador</small></span>
+    </div>
+    <a href="{{ url_for('logout') }}" class="btn-logout" title="Terminar sessão">{{ icone('sair', 18) }}<span>Sair</span></a>
+  </div>
+</aside>
+
+<script>
+  (function () {
+    var menu = document.getElementById("menu-lateral");
+    var sombra = document.getElementById("sombra-menu");
+    var abrir = document.getElementById("abrir-menu");
+    function alternar(aberto) {
+      menu.classList.toggle("aberto", aberto);
+      sombra.hidden = !aberto;
+      abrir.setAttribute("aria-expanded", aberto ? "true" : "false");
+      document.body.classList.toggle("menu-aberto", aberto);
+    }
+    abrir.addEventListener("click", function () { alternar(true); });
+    document.getElementById("fechar-menu").addEventListener("click", function () { alternar(false); });
+    sombra.addEventListener("click", function () { alternar(false); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") alternar(false); });
+    {% if abas %}
+    // Separadores do painel: também abrem pelo endereço (#tab-explicadores), vindo de outras páginas.
+    var titulos = { "tab-disciplinas": "Disciplinas", "tab-explicadores": "Explicadores", "tab-estudantes": "Estudantes" };
+    function mostrarAba(id) {
+      if (!document.getElementById(id)) return;
+      document.querySelectorAll(".admin-tab-content").forEach(function (t) { t.hidden = t.id !== id; });
+      document.querySelectorAll("[data-aba]").forEach(function (a) { a.classList.toggle("active", a.dataset.aba === id); });
+      var titulo = document.getElementById("tituloPainel");
+      if (titulo) titulo.textContent = titulos[id];
+      alternar(false);
+    }
+    document.querySelectorAll("[data-aba]").forEach(function (a) {
+      a.addEventListener("click", function (e) { e.preventDefault(); history.replaceState(null, "", "#" + a.dataset.aba); mostrarAba(a.dataset.aba); });
+    });
+    document.addEventListener("DOMContentLoaded", function () { if (location.hash) mostrarAba(location.hash.slice(1)); });
+    {% endif %}
+  })();
+</script>

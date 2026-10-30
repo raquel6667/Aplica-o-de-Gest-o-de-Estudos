@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ m.titulo }} — StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="admin-page">
+  {% from '_icones.html' import icone, logotipo %}
+  {% from '_material_macros.html' import etiqueta_disciplina %}
+  {% set ativo = 'material' %}
+  <div class="admin-layout">
+    {% include '_sidebar.html' %}
+
+    <div class="main-content">
+      <header class="top-header">
+        <h1>{{ m.titulo }}</h1>
+      </header>
+
+      {% include '_flash.html' %}
+
+      <main class="admin-container">
+        <section class="card" style="margin-bottom: 24px;">
+          <p style="margin-top: 0;"><a class="link-voltar" href="{{ url_for('lista_material') }}">{{ icone('voltar', 16) }} O meu material</a></p>
+          <p><span class="etiqueta-tipo" style="margin-left: 0;">{{ m.tipo|tipo_material }}</span> · {{ etiqueta_disciplina(m) }}</p>
+          <div class="botoes-material">
+            <a href="{{ url_for('editar_material', id_material=m.id) }}" class="btn-action edit">Editar</a>
+            <form action="{{ url_for('eliminar_material', id_material=m.id) }}" method="POST" style="margin: 0;"
+                  onsubmit="return confirm('Eliminar este material? Esta ação não pode ser desfeita.');">
+              <button type="submit" class="btn-action delete" style="width: auto; padding: 0 16px;">Eliminar</button>
+            </form>
+          </div>
+        </section>
+
+        <section class="card">
+          {% if m.tipo == 'resumo' %}
+            <h2>Resumo</h2>
+            <div class="texto-resumo">{{ m.conteudo }}</div>
+
+          {% elif m.tipo == 'questionario' %}
+            <h2>Praticar ({{ m.itens|length }} pergunta(s))</h2>
+            <form id="questionario">
+              {% for p in m.itens %}
+                {% set n = loop.index0 %}
+                <fieldset class="pergunta-pratica" data-pergunta="{{ n }}">
+                  <legend>{{ loop.index }}. {{ p.enunciado }}</legend>
+                  {% for o in p.opcoes %}
+                    <label class="opcao-pratica" data-correta="{{ 'sim' if o.correta else 'nao' }}">
+                      <input type="radio" name="p{{ n }}" value="{{ loop.index0 }}"> <span>{{ o.texto }}</span>
+                    </label>
+                  {% endfor %}
+                </fieldset>
+              {% endfor %}
+              <div class="botoes-material">
+                <button type="submit" class="btn" style="width: auto; min-width: 160px;">Corrigir</button>
+                <button type="button" class="btn-action edit" id="repetir" hidden>Repetir</button>
+              </div>
+              <p id="pontuacao" class="pontuacao" role="status" hidden></p>
+            </form>
+
+          {% else %}
+            <h2>Praticar ({{ m.itens|length }} cartão(ões))</h2>
+            <div class="flashcard" id="flashcard" tabindex="0" role="button" aria-label="Virar o cartão">
+              <span class="flashcard-lado" id="lado">Frente</span>
+              <p id="texto-cartao"></p>
+              <small style="color: var(--muted);">Carrega no cartão (ou na tecla Espaço) para o virar.</small>
+            </div>
+            <div class="botoes-material" style="justify-content: center; align-items: center; margin-top: 14px;">
+              <button type="button" class="btn-action edit" id="anterior">← Anterior</button>
+              <span id="posicao" style="font-weight: 800; color: var(--blue-800);"></span>
+              <button type="button" class="btn-action edit" id="seguinte">Seguinte →</button>
+            </div>
+          {% endif %}
+        </section>
+      </main>
+    </div>
+  </div>
+
+  {% if m.tipo == 'questionario' %}
+  <script>
+    (function () {
+      // Os resultados não são guardados: a correção é feita aqui, no fim.
+      var form = document.getElementById("questionario");
+      var pontuacao = document.getElementById("pontuacao");
+      var repetir = document.getElementById("repetir");
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var perguntas = form.querySelectorAll(".pergunta-pratica");
+        var certas = 0;
+        perguntas.forEach(function (p) {
+          var escolhida = p.querySelector("input:checked");
+          p.querySelectorAll(".opcao-pratica").forEach(function (o) {
+            var correta = o.dataset.correta === "sim";
+            o.classList.toggle("certa", correta);
+            o.classList.toggle("errada", !correta && o.contains(escolhida));
+            o.querySelector("input").disabled = true;
+          });
+          if (escolhida && escolhida.closest(".opcao-pratica").dataset.correta === "sim") certas++;
+          p.classList.toggle("sem-resposta", !escolhida);
+        });
+        pontuacao.textContent = "Pontuação: " + certas + " de " + perguntas.length + " (" + Math.round(certas * 100 / perguntas.length) + "%). As respostas corretas estão assinaladas a verde.";
+        pontuacao.hidden = false;
+        form.querySelector("button[type=submit]").hidden = true;
+        repetir.hidden = false;
+      });
+      repetir.addEventListener("click", function () {
+        form.reset();
+        form.querySelectorAll(".opcao-pratica").forEach(function (o) {
+          o.classList.remove("certa", "errada");
+          o.querySelector("input").disabled = false;
+        });
+        form.querySelectorAll(".pergunta-pratica").forEach(function (p) { p.classList.remove("sem-resposta"); });
+        pontuacao.hidden = true;
+        repetir.hidden = true;
+        form.querySelector("button[type=submit]").hidden = false;
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    })();
+  </script>
+  {% elif m.tipo == 'flashcards' %}
+  <script>
+    (function () {
+      var cartoes = {{ m.itens|tojson }};
+      var atual = 0, verso = false;
+      var cartao = document.getElementById("flashcard");
+      var lado = document.getElementById("lado");
+      var texto = document.getElementById("texto-cartao");
+      var posicao = document.getElementById("posicao");
+      var anterior = document.getElementById("anterior");
+      var seguinte = document.getElementById("seguinte");
+      function mostrar() {
+        var c = cartoes[atual];
+        texto.textContent = verso ? c.verso : c.frente;
+        lado.textContent = verso ? "Verso" : "Frente";
+        cartao.classList.toggle("virado", verso);
+        posicao.textContent = (atual + 1) + " / " + cartoes.length;
+        anterior.disabled = atual === 0;
+        seguinte.disabled = atual === cartoes.length - 1;
+      }
+      function virar() { verso = !verso; mostrar(); }
+      cartao.addEventListener("click", virar);
+      cartao.addEventListener("keydown", function (e) { if (e.key === " " || e.key === "Enter") { e.preventDefault(); virar(); } });
+      anterior.addEventListener("click", function () { if (atual > 0) { atual--; verso = false; mostrar(); } });
+      seguinte.addEventListener("click", function () { if (atual < cartoes.length - 1) { atual++; verso = false; mostrar(); } });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "ArrowLeft") anterior.click();
+        if (e.key === "ArrowRight") seguinte.click();
+      });
+      mostrar();
+    })();
+  </script>
+  {% endif %}
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Histórico de Transações — StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="admin-page">
+  {% set ativo = 'transacoes' %}
+  <div class="admin-layout">
+    {% include '_sidebar.html' %}
+
+    <div class="main-content">
+      <header class="top-header">
+        <h1>Histórico de Transações</h1>
+      </header>
+
+      {% include '_flash.html' %}
+
+      <main class="admin-container">
+        <section class="card" style="margin-bottom: 24px;">
+          <h2>Filtros</h2>
+          <form method="GET" action="{{ url_for('historico_transacoes') }}" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; align-items: flex-end;">
+            <div class="form-group" style="margin: 0;">
+              <label for="estado">Estado</label>
+              <select id="estado" name="estado">
+                <option value="">Todos</option>
+                {% for chave, nome in estados.items() %}
+                  <option value="{{ chave }}" {% if filtros.estado == chave %}selected{% endif %}>{{ nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group" style="margin: 0;">
+              <label for="de">De</label>
+              <input type="date" id="de" name="de" value="{{ filtros.de or '' }}" />
+            </div>
+            <div class="form-group" style="margin: 0;">
+              <label for="ate">Até</label>
+              <input type="date" id="ate" name="ate" value="{{ filtros.ate or '' }}" />
+            </div>
+            <div class="form-group" style="margin: 0;">
+              <label for="ordem">Ordem</label>
+              <select id="ordem" name="ordem">
+                <option value="desc" {% if filtros.ordem == 'desc' %}selected{% endif %}>Mais recentes primeiro</option>
+                <option value="asc" {% if filtros.ordem == 'asc' %}selected{% endif %}>Mais antigas primeiro</option>
+              </select>
+            </div>
+            <button type="submit" class="btn" style="height: 50px;">Filtrar</button>
+          </form>
+        </section>
+
+        <section class="card">
+          <h2>{% if papel == 'estudante' %}As minhas transações{% else %}Transações das minhas sessões{% endif %}</h2>
+          {% if transacoes %}
+          <div style="overflow-x: auto;">
+            <table class="subjects-table">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Disciplina</th>
+                  <th>Sessão</th>
+                  <th>{% if papel == 'estudante' %}Explicador{% else %}Estudante{% endif %}</th>
+                  <th>Valor</th>
+                  {% if papel == 'explicador' %}<th>Comissão</th><th>Recebes</th>{% endif %}
+                  <th>Estado</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for t in transacoes %}
+                <tr>
+                  <td>{{ t.criado_em.strftime('%d/%m/%Y %H:%M') }}</td>
+                  <td>{{ t.nome_disciplina }}</td>
+                  <td>{{ t.data_sessao.strftime('%d/%m/%Y %H:%M') }}</td>
+                  <td>{% if papel == 'estudante' %}{{ t.nome_explicador }}{% else %}{{ t.nome_estudante }}{% endif %}</td>
+                  <td>{{ t.valor|eur }}</td>
+                  {% if papel == 'explicador' %}
+                    <td>{{ t.comissao|eur }}</td>
+                    <td>{{ t.valor_explicador|eur }}{% if t.estado == 'paga' and not t.paypal_payout_id %} <small style="color: var(--muted);">(repasse por efetuar)</small>{% endif %}</td>
+                  {% endif %}
+                  <td>{{ t.estado|estado_transacao }}</td>
+                  <td><a href="{{ url_for('ver_sessao', id_sessao=t.id_sessao) }}">Ver sessão</a></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+            <p style="text-align: center; color: var(--muted); padding: 20px 0;">Nenhuma transação encontrada.</p>
+          {% endif %}
+        </section>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

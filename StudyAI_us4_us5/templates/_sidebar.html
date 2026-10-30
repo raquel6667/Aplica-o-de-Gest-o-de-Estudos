@@ -1,0 +1,106 @@
+{# Menu lateral do Estudante e do Explicador (o mesmo em todas as páginas).
+   Antes de incluir: {% set ativo = 'sessoes' %}. Para um Explicador por validar: {% set bloqueado = True %}.
+   Em ecrãs pequenos passa a gaveta, aberta pelo botão ☰ da barra de topo. #}
+{% from '_icones.html' import icone, logotipo %}
+{% set e_estudante = session.papel == 'estudante' %}
+{% set bloqueado = bloqueado|default(False) %}
+{% set ind = indicadores_comunicacao() if not bloqueado else {'mensagens': 0, 'pedidos': 0} %}
+
+{% macro item(endpoint, chave, nome, icon, indicador=None) -%}
+  {%- if bloqueado and chave != 'perfil' -%}
+  <li><span class="nav-item bloqueado" title="Disponível após validação do Administrador">{{ icone(icon) }}<span>{{ nome }}</span>{{ icone('cadeado', 14, 'nav-cadeado') }}</span></li>
+  {%- else -%}
+  <li><a href="{{ url_for(endpoint) }}" class="nav-item {% if ativo == chave %}active{% endif %}" {% if ativo == chave %}aria-current="page"{% endif %}>
+    {{ icone(icon) }}<span>{{ nome }}</span>
+    {%- if indicador %}<span class="badge-menu" data-indicador="{{ indicador }}" {% if not ind[indicador] %}hidden{% endif %}>{{ ind[indicador] }}</span>{% endif -%}
+  </a></li>
+  {%- endif -%}
+{%- endmacro %}
+
+<header class="barra-movel">
+  <button type="button" class="botao-menu" id="abrir-menu" aria-controls="menu-lateral" aria-expanded="false" aria-label="Abrir o menu">{{ icone('menu', 22) }}</button>
+  <a href="{{ url_for('painel_estudante' if e_estudante else 'painel_explicador') }}" class="barra-movel-logo">{{ logotipo(30) }}</a>
+  {% if ind.mensagens or ind.pedidos %}<span class="ponto-novidade" title="Tens novidades"></span>{% endif %}
+</header>
+<div class="sombra-menu" id="sombra-menu" hidden></div>
+
+<aside class="sidebar" id="menu-lateral" aria-label="Menu principal">
+  <div class="sidebar-header">
+    <a href="{{ url_for('painel_estudante' if e_estudante else 'painel_explicador') }}" class="sidebar-logo">{{ logotipo(34) }}</a>
+    <button type="button" class="botao-menu fechar-menu" id="fechar-menu" aria-label="Fechar o menu">{{ icone('fechar', 20) }}</button>
+  </div>
+  <nav class="sidebar-nav">
+    <ul>
+      {{ item('painel_estudante' if e_estudante else 'painel_explicador', 'perfil', 'O meu perfil', 'perfil') }}
+    </ul>
+    <p class="nav-secao">Explicações</p>
+    <ul>
+      {% if e_estudante %}
+        {{ item('gerir_disciplinas_pessoais', 'disciplinas', 'Disciplinas e avaliações', 'avaliacoes') }}
+        {{ item('pesquisar_explicadores', 'pesquisa', 'Pesquisar explicadores', 'pesquisar') }}
+        {{ item('sessoes_estudante', 'sessoes', 'As minhas sessões', 'sessoes') }}
+      {% else %}
+        {{ item('gerir_disciplinas_explicador', 'disciplinas', 'As minhas disciplinas', 'disciplinas') }}
+        {{ item('sessoes_explicador', 'sessoes', 'As minhas sessões', 'sessoes') }}
+      {% endif %}
+      {{ item('historico_transacoes', 'transacoes', 'Transações', 'transacoes') }}
+      {{ item('definicoes_calendario', 'calendario', 'Calendário', 'calendario') }}
+    </ul>
+    <p class="nav-secao">Comunidade</p>
+    <ul>
+      {{ item('amigos', 'amigos', 'Amigos', 'amigos', 'pedidos') }}
+      {{ item('conversas', 'conversas', 'Conversas', 'conversas', 'mensagens') }}
+    </ul>
+    <p class="nav-secao">Estudo</p>
+    <ul>
+      {{ item('lista_material', 'material', 'Material de estudo', 'material') }}
+      {{ item('assistente_ia', 'assistente', 'Assistente Gemini', 'ia') }}
+    </ul>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="cartao-utilizador">
+      <span class="avatar-inicial" aria-hidden="true">{{ (session.username or '?')[:1]|upper }}</span>
+      <span class="cartao-utilizador-texto">
+        <strong>{{ session.username }}</strong>
+        <small>{{ 'Estudante' if e_estudante else 'Explicador' }}</small>
+      </span>
+    </div>
+    <a href="{{ url_for('logout') }}" class="btn-logout" title="Terminar sessão">{{ icone('sair', 18) }}<span>Sair</span></a>
+  </div>
+</aside>
+
+<script>
+  (function () {
+    // Gaveta do menu em ecrãs pequenos.
+    var menu = document.getElementById("menu-lateral");
+    var sombra = document.getElementById("sombra-menu");
+    var abrir = document.getElementById("abrir-menu");
+    function alternar(aberto) {
+      menu.classList.toggle("aberto", aberto);
+      sombra.hidden = !aberto;
+      abrir.setAttribute("aria-expanded", aberto ? "true" : "false");
+      document.body.classList.toggle("menu-aberto", aberto);
+    }
+    abrir.addEventListener("click", function () { alternar(true); });
+    document.getElementById("fechar-menu").addEventListener("click", function () { alternar(false); });
+    sombra.addEventListener("click", function () { alternar(false); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") alternar(false); });
+
+    {% if not bloqueado %}
+    // Contadores de pedidos de amizade e mensagens não lidas (atualizam-se sozinhos).
+    setInterval(function () {
+      fetch("{{ url_for('comunicacao_indicadores') }}", { headers: { "Accept": "application/json" } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (dados) {
+          if (!dados) return;
+          document.querySelectorAll("[data-indicador]").forEach(function (el) {
+            var n = dados[el.dataset.indicador] || 0;
+            el.textContent = n;
+            el.hidden = n === 0;
+          });
+        })
+        .catch(function () {});
+    }, 10000);
+    {% endif %}
+  })();
+</script>

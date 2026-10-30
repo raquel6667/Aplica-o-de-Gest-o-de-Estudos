@@ -7,18 +7,25 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
 <body class="login-page">
+  {% from '_icones.html' import icone, logotipo %}
 
   <div class="login-container">
-    <h2>Portal Admin</h2>
+    <a href="{{ url_for('landing_page') }}" style="text-decoration: none;">{{ logotipo(40) }}</a>
+    <h2>Portal do Administrador</h2>
+    <p class="subtitulo-login">Acesso reservado à gestão da plataforma.</p>
 
-<!-- CÓDIGO NOVO -->
+    {% for aviso in get_flashed_messages() %}
+      <div class="error-msg">{{ aviso }}</div>
+    {% endfor %}
+
     {% if mensagem_erro %}
       <div id="errorBox" class="error-msg">
         {{ mensagem_erro }}
       </div>
     {% endif %}
 
-    <form id="loginForm" action="{{ url_for('login') }}" method="POST">
+    <!-- CORREÇÃO AQUI: o action aponta agora para admin_login -->
+    <form id="loginForm" action="{{ url_for('admin_login') }}" method="POST">
 
       <div class="form-group">
         <label for="username">Username</label>
@@ -46,7 +53,9 @@
 
       <button type="submit" class="btn">Login</button>
     </form>
-  </div>
-
+      <div style="text-align: center; margin-top: 22px; font-size: 0.9rem; display: flex; flex-direction: column; gap: 10px;">
+        <a href="{{ url_for('landing_page') }}" style="color: var(--muted); font-weight: 600; text-decoration: none; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">{{ icone('voltar', 16) }} Voltar à página inicial</a>
+      </div>
+  {% include '_palavra_passe.html' %}
 </body>
 </html>

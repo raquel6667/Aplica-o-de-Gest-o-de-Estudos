@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestão Académica — StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="admin-page">
+
+  <div class="admin-layout">
+    {% set ativo = 'disciplinas' %}
+    {% include '_sidebar.html' %}
+
+    <div class="main-content">
+      <header class="top-header">
+        <h1>Gestão Académica e Desempenho</h1>
+      </header>
+
+      {% with mensagens = get_flashed_messages(with_categories=true) %}
+        {% if mensagens %}
+        <div class="flash-area">
+          {% for categoria, texto in mensagens %}
+            <div class="flash {{ 'success' if categoria == 'success' else 'error' }}">{{ texto }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      {% endwith %}
+
+      <main class="admin-container grade-2">
+        
+        <!-- Formulário: Criar Disciplina Pessoal -->
+        <section class="card">
+          <h2>Adicionar Disciplina Pessoal</h2>
+          <form action="{{ url_for('gerir_disciplinas_pessoais') }}" method="POST">
+            <div class="form-group">
+              <label for="nome_disciplina">Nome da Disciplina</label>
+              <input type="text" id="nome_disciplina" name="nome_disciplina" placeholder="Ex: Matemática A, Física..." required />
+            </div>
+            <button type="submit" class="btn">Criar Disciplina</button>
+          </form>
+
+          <div style="margin-top: 30px; padding: 16px; background: var(--cream); border-radius: 12px; border: 1px solid var(--line);">
+            <h3 style="margin-top: 0; font-size: 1.05rem; color: var(--amber-950);">Média Global do Estudante</h3>
+            <p style="font-size: 1.5rem; font-weight: 800; color: var(--orange-700); margin: 0;">
+              {% if media_global is not none %}{{ media_global }} / 20{% else %}Sem avaliações registadas{% endif %}
+            </p>
+          </div>
+        </section>
+
+        <!-- Formulário: Registar Avaliação -->
+        <section class="card">
+          <h2>Registar Nova Avaliação</h2>
+          <form action="{{ url_for('registar_avaliacao') }}" method="POST">
+            <div class="form-group">
+              <label for="id_disciplina_pessoal">Disciplina Pessoal</label>
+              <select id="id_disciplina_pessoal" name="id_disciplina_pessoal" required>
+                <option value="">Seleciona a disciplina</option>
+                {% for d in disciplinas %}
+                  <option value="{{ d.id }}">{{ d.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="designacao">Designação (ex: Teste 1)</label>
+              <input type="text" id="designacao" name="designacao" placeholder="Ex: Ficha de Avaliação 1" required />
+            </div>
+            <div class="form-group">
+              <label for="nota">Nota</label>
+              <input type="number" step="0.01" id="nota" name="nota" placeholder="Ex: 14.5 ou 75" required />
+            </div>
+            <div class="form-group">
+              <label for="escala">Escala</label>
+              <select id="escala" name="escala" required>
+                <option value="0_20">Escala de 0 a 20</option>
+                <option value="percentagem">Percentagem (%)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="data">Data da Avaliação</label>
+              <input type="date" id="data" name="data" required />
+            </div>
+            <button type="submit" class="btn">Registar Avaliação</button>
+          </form>
+        </section>
+
+        <!-- Listagem de Disciplinas e Avaliações -->
+        <section class="card" style="grid-column: 1 / -1;">
+          <h2>As Minhas Disciplinas e Avaliações</h2>
+          {% for d in disciplinas %}
+            <div style="margin-bottom: 24px; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface);">
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); padding-bottom: 10px; margin-bottom: 14px;">
+                <h3 style="margin: 0; color: var(--amber-950);">{{ d.nome }}</h3>
+                <div style="display: flex; gap: 14px; align-items: center;">
+                  <span style="font-weight: 700; color: var(--blue-800);">
+                    Média: {% if d.media is not none %}{{ d.media }} / 20{% else %}Sem notas{% endif %}
+                  </span>
+                  <form action="{{ url_for('eliminar_disciplina_pessoal') }}" method="POST" style="margin: 0;" onsubmit="return confirm('Pretendes eliminar esta disciplina e todas as suas avaliações? O material de estudo associado não é apagado: fica com a etiqueta «Sem disciplina».');">
+                    <input type="hidden" name="id_disciplina_pessoal" value="{{ d.id }}">
+                    <button type="submit" class="btn-action delete">Eliminar</button>
+                  </form>
+                </div>
+              </div>
+
+              {% if d.avaliacoes %}
+                <table class="subjects-table" style="min-width: 100%;">
+                  <thead>
+                    <tr>
+                      <th>Designação</th>
+                      <th>Nota</th>
+                      <th>Escala</th>
+                      <th>Data</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for av in d.avaliacoes %}
+                    <tr>
+                      <td>{{ av.designacao }}</td>
+                      <td>{{ av.nota }}</td>
+                      <td>{{ '0 a 20' if av.escala == '0_20' else 'Percentagem (%)' }}</td>
+                      <td>{{ av.data }}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              {% else %}
+                <p style="color: var(--muted); font-size: 0.9rem; margin: 0;">Ainda não existem avaliações registadas para esta disciplina.</p>
+              {% endif %}
+            </div>
+          {% else %}
+            <p style="text-align: center; color: var(--muted);">Ainda não criaste nenhuma disciplina pessoal.</p>
+          {% endfor %}
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+</body>
+</html>

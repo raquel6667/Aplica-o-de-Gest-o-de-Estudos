@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>As Minhas Sessões — StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="admin-page">
+  {% from '_icones.html' import icone, logotipo %}
+
+  <div class="admin-layout">
+    {% set ativo = 'sessoes' %}
+    {% include '_sidebar.html' %}
+
+    <div class="main-content">
+      <header class="top-header">
+        <h1>Gestão de Sessões de Explicação</h1>
+      </header>
+
+      {% with mensagens = get_flashed_messages(with_categories=true) %}
+        {% if mensagens %}
+        <div class="flash-area">
+          {% for categoria, texto in mensagens %}
+            <div class="flash {{ 'success' if categoria == 'success' else 'error' }}">{{ texto }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      {% endwith %}
+
+      <main class="admin-container grade-2">
+        
+        <!-- Formulário de Agendamento -->
+        <section class="card">
+          <h2>Agendar Nova Sessão (17,00 €)</h2>
+          {% if tem_divida %}
+            <div style="padding: 14px; background: var(--warning-bg); border: 1px solid var(--danger-border); border-radius: 10px; color: var(--warning); font-weight: 700; margin-bottom: 16px;">
+              {{ icone('aviso', 16) }} Tens pagamentos em dívida. Novas marcações estão bloqueadas até regularizares a situação.
+            </div>
+          {% endif %}
+
+          <form action="{{ url_for('sessoes_estudante') }}" method="POST">
+            <div class="form-group">
+              <label for="codigo_disciplina">1. Seleciona a Disciplina</label>
+              <select id="codigo_disciplina" name="codigo_disciplina" required {% if tem_divida %}disabled{% endif %} onchange="atualizarExplicadores()">
+                <option value="">Seleciona uma disciplina</option>
+                {% for d in disciplinas_ativas %}
+                  <option value="{{ d.codigo }}">{{ d.codigo }} - {{ d.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="id_explicador">2. Professor Disponível</label>
+              <select id="id_explicador" name="id_explicador" required {% if tem_divida %}disabled{% endif %} onchange="atualizarModalidades()">
+                <option value="">Seleciona primeiro uma disciplina</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="modalidade">Modalidade</label>
+              <select id="modalidade" name="modalidade" required {% if tem_divida %}disabled{% endif %}>
+                <option value="online">Online</option>
+                <option value="presencial">Presencial</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="data_hora">Data e Hora (Duração: 1 hora)</label>
+              <input type="datetime-local" id="data_hora" name="data_hora" required {% if tem_divida %}disabled{% endif %} />
+            </div>
+
+            <button type="submit" class="btn" {% if tem_divida %}style="opacity: 0.6; cursor: not-allowed;" disabled{% endif %}>Pedir Sessão</button>
+          </form>
+        </section>
+
+        <!-- Lista "As minhas sessões" Organizada por Abas -->
+        <section class="card">
+          <h2>As Minhas Sessões</h2>
+
+          <!-- Abas de Navegação -->
+          <div style="display: flex; gap: 8px; margin: 16px 0; border-bottom: 2px solid var(--line); padding-bottom: 12px;">
+            <button onclick="mudarAba('ativas', event)" class="tab-btn active">Ativas & Pendentes</button>
+            <button onclick="mudarAba('concluidas', event)" class="tab-btn">Concluídas</button>
+            <button onclick="mudarAba('historico', event)" class="tab-btn">Canceladas / Recusadas</button>
+          </div>
+
+          <!-- Aba 1: Ativas e Pendentes -->
+          <div id="tab-ativas" class="conteudo-tab ativo">
+            {% set ativas = sessoes | selectattr('estado', 'in', ['pendente', 'confirmada']) | list %}
+            {% for s in ativas %}
+              <div style="border: 1px solid var(--line); border-radius: 12px; padding: 16px; background: var(--surface);">
+                <h3 style="margin: 0 0 6px; font-size: 1.05rem; color: var(--amber-950);">{{ s.nome_disciplina }}</h3>
+                <p style="margin: 0 0 6px; font-size: 0.85rem;"><a href="{{ url_for('ver_sessao', id_sessao=s.id) }}">Ver sessão e pagamento</a></p>
+                <p style="margin: 0 0 4px; font-size: 0.9rem; color: var(--muted);"><strong>Explicador:</strong> {{ s.nome_explicador }}</p>
+                <p style="margin: 0 0 4px; font-size: 0.9rem; color: var(--muted);"><strong>Data/Hora:</strong> {{ s.data_hora.strftime('%Y-%m-%d %H:%M') }}</p>
+                <p style="margin: 0 0 8px; font-size: 0.9rem; color: var(--muted);"><strong>Modalidade:</strong> {{ s.modalidade.capitalize() }}</p>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; flex-wrap: wrap; gap: 8px;">
+                  <span style="display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 800; background: var(--info-bg); color: var(--blue-800);">
+                    Estado: {{ s.estado.replace('_', ' ').capitalize() }}
+                  </span>
+
+                  {% if s.estado == 'confirmada' and s.modalidade == 'online' %}
+                    {% set diff_minutos = (s.data_hora - agora).total_seconds() / 60 %}
+                    {% if diff_minutos <= 10 and diff_minutos >= -60 %}
+                      <a href="https://zoom.us/join" target="_blank" class="btn btn-azul" style="padding: 6px 14px; font-size: 0.85rem; text-decoration: none;">Iniciar Sessão (Zoom)</a>
+                    {% else %}
+                      <span style="font-size: 0.8rem; color: var(--muted);">Zoom disponível 10 min antes</span>
+                    {% endif %}
+                  {% endif %}
+
+                  {% if s.data_hora > agora %}
+                    <form action="{{ url_for('cancelar_sessao') }}" method="POST" style="margin: 0;" onsubmit="return confirm('Tens a certeza que pretendes cancelar esta sessão?');">
+                      <input type="hidden" name="id_sessao" value="{{ s.id }}">
+                      <button type="submit" class="btn-action delete" style="padding: 6px 12px; font-size: 0.8rem;">Cancelar</button>
+                    </form>
+                  {% endif %}
+                </div>
+              </div>
+            {% else %}
+              <p style="text-align: center; color: var(--muted); padding: 20px 0;">Não tens sessões ativas ou pendentes.</p>
+            {% endfor %}
+          </div>
+
+          <!-- Aba 2: Concluídas -->
+          <div id="tab-concluidas" class="conteudo-tab">
+            {% set concluidas = sessoes | selectattr('estado', 'in', ['concluida', 'concluida_nao_paga']) | list %}
+            {% for s in concluidas %}
+              <div style="border: 1px solid var(--line); border-radius: 12px; padding: 16px; background: var(--surface-2);">
+                <h3 style="margin: 0 0 6px; font-size: 1.05rem; color: var(--amber-950);">{{ s.nome_disciplina }}</h3>
+                <p style="margin: 0 0 6px; font-size: 0.85rem;"><a href="{{ url_for('ver_sessao', id_sessao=s.id) }}">Ver sessão e pagamento</a></p>
+                <p style="margin: 0 0 4px; font-size: 0.9rem; color: var(--muted);"><strong>Explicador:</strong> {{ s.nome_explicador }}</p>
+                <p style="margin: 0 0 4px; font-size: 0.9rem; color: var(--muted);"><strong>Data/Hora:</strong> {{ s.data_hora.strftime('%Y-%m-%d %H:%M') }}</p>
+                <span style="display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 800; background: var(--success-bg); color: var(--success); margin-top: 8px;">
+                  {{ s.estado|estado_sessao }}
+                </span>
+              </div>
+            {% else %}
+              <p style="text-align: center; color: var(--muted); padding: 20px 0;">Ainda não tens sessões concluídas.</p>
+            {% endfor %}
+          </div>
+
+          <!-- Aba 3: Canceladas / Recusadas -->
+          <div id="tab-historico" class="conteudo-tab">
+            {% set inativas = sessoes | selectattr('estado', 'in', ['cancelada', 'recusada']) | list %}
+            {% for s in inativas %}
+              <div style="border: 1px solid var(--line); border-radius: 12px; padding: 16px; background: var(--danger-bg);">
+                <h3 style="margin: 0 0 6px; font-size: 1.05rem; color: var(--amber-950);">{{ s.nome_disciplina }}</h3>
+                <p style="margin: 0 0 6px; font-size: 0.85rem;"><a href="{{ url_for('ver_sessao', id_sessao=s.id) }}">Ver sessão e pagamento</a></p>
+                <p style="margin: 0 0 4px; font-size: 0.9rem; color: var(--muted);"><strong>Explicador:</strong> {{ s.nome_explicador }}</p>
+                <p style="margin: 0 0 4px; font-size: 0.9rem; color: var(--muted);"><strong>Data/Hora:</strong> {{ s.data_hora.strftime('%Y-%m-%d %H:%M') }}</p>
+                <span style="display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 800; background: var(--danger-bg); color: var(--danger); margin-top: 8px; text-transform: capitalize;">
+                  {{ s.estado }}
+                </span>
+              </div>
+            {% else %}
+              <p style="text-align: center; color: var(--muted); padding: 20px 0;">Sem registos de sessões canceladas ou recusadas.</p>
+            {% endfor %}
+          </div>
+
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <script type="application/json" id="relacoes-disciplinas-explicadores">
+    {{ disciplina_explicadores | tojson }}
+  </script>
+
+  <script>
+    const relacoes = JSON.parse(document.getElementById("relacoes-disciplinas-explicadores").textContent);
+
+    function atualizarExplicadores() {
+      const selectDisciplina = document.getElementById("codigo_disciplina");
+      const selectExplicador = document.getElementById("id_explicador");
+      const codigoDisciplina = selectDisciplina.value;
+
+      selectExplicador.innerHTML = '<option value="">Seleciona o explicador</option>';
+
+      if (!codigoDisciplina) return;
+
+      const explicadoresFiltrados = relacoes.filter(r => r.codigo_disciplina === codigoDisciplina);
+
+      if (explicadoresFiltrados.length === 0) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "Não há explicadores disponíveis para esta disciplina.";
+        selectExplicador.appendChild(opt);
+        return;
+      }
+
+      explicadoresFiltrados.forEach(r => {
+        const opt = document.createElement("option");
+        opt.value = r.id_explicador;
+        opt.textContent = r.nome_explicador;
+        selectExplicador.appendChild(opt);
+      });
+      atualizarModalidades();
+    }
+
+    // Só mostra as modalidades que o explicador escolhido aceita (online, presencial ou ambas).
+    function atualizarModalidades() {
+      const idExplicador = document.getElementById("id_explicador").value;
+      const codigoDisciplina = document.getElementById("codigo_disciplina").value;
+      const selectModalidade = document.getElementById("modalidade");
+      const relacao = relacoes.find(r => String(r.id_explicador) === idExplicador && r.codigo_disciplina === codigoDisciplina);
+      const aceite = relacao ? relacao.modalidade_explicador : 'ambas';
+      Array.from(selectModalidade.options).forEach(o => {
+        const permitido = aceite === 'ambas' || aceite === o.value;
+        o.disabled = !permitido;
+        o.hidden = !permitido;
+      });
+      if (selectModalidade.selectedOptions[0] && selectModalidade.selectedOptions[0].disabled) {
+        const primeira = Array.from(selectModalidade.options).find(o => !o.disabled);
+        if (primeira) selectModalidade.value = primeira.value;
+      }
+    }
+
+    function mudarAba(nomeAba, evento) {
+      document.querySelectorAll('.conteudo-tab').forEach(el => el.classList.remove('ativo'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+      document.getElementById('tab-' + nomeAba).classList.add('ativo');
+      evento.currentTarget.classList.add('active');
+    }
+  </script>
+
+</body>
+</html>

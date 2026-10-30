@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Criar Conta — StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="login-page">
+  {% from '_icones.html' import icone, logotipo %}
+
+  <div class="login-container" style="width: min(100%, 560px);">
+    <a href="{{ url_for('landing_page') }}" style="text-decoration: none;">{{ logotipo(40) }}</a>
+    <h2>Criar conta</h2>
+    <p class="subtitulo-login">Junta-te ao StudyAI como Estudante ou Explicador.</p>
+
+    {% with mensagens = get_flashed_messages(with_categories=true) %}
+      {% if mensagens %}
+        {% for categoria, texto in mensagens %}
+          <div class="error-msg {% if categoria == 'success' %}flash-success{% else %}flash-error{% endif %}">
+            {{ texto }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form action="{{ url_for('registar') }}" method="POST" id="registerForm" enctype="multipart/form-data">
+      
+      <!-- Seleção de Tipo de Perfil -->
+      <div class="form-group">
+        <label>Escolhe o teu tipo de conta *</label>
+        <div class="profile-type-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+          <label class="profile-card active" id="cardEstudante" style="cursor: pointer; padding: 14px; border: 2px solid var(--line); border-radius: 12px; display: flex; align-items: center; gap: 10px; background: var(--surface);">
+            <input type="radio" name="tipo_perfil" value="estudante" checked class="sr-only" />
+            <span class="profile-icon">{{ icone('estudante', 26) }}</span>
+            <div>
+              <strong style="display: block; font-size: 0.95rem; color: var(--amber-950);">Estudante</strong>
+              <p style="margin: 0; font-size: 0.8rem; color: var(--muted);">Organiza estudos e avaliações.</p>
+            </div>
+          </label>
+          <label class="profile-card" id="cardExplicador" style="cursor: pointer; padding: 14px; border: 2px solid var(--line); border-radius: 12px; display: flex; align-items: center; gap: 10px; background: var(--surface);">
+            <input type="radio" name="tipo_perfil" value="explicador" class="sr-only" />
+            <span class="profile-icon">{{ icone('explicador', 26) }}</span>
+            <div>
+              <strong style="display: block; font-size: 0.95rem; color: var(--amber-950);">Explicador</strong>
+              <p style="margin: 0; font-size: 0.8rem; color: var(--muted);">Disponibiliza explicações.</p>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Campos Comuns -->
+      <div class="form-group">
+        <label for="nome_completo">Nome completo *</label>
+        <input type="text" id="nome_completo" name="nome_completo" placeholder="O teu nome completo" required />
+      </div>
+
+      <div class="form-group">
+        <label for="username">Nome de utilizador *</label>
+        <input type="text" id="username" name="username" placeholder="Nome de utilizador único" autocomplete="username" required
+               minlength="3" maxlength="20" pattern="[A-Za-z0-9._]{3,20}" title="3 a 20 caracteres: letras, números, ponto e underscore" />
+        <small style="color: var(--muted);">3 a 20 caracteres (letras, números, ponto e underscore). Não pode ser alterado depois e é como os outros te encontram.</small>
+      </div>
+
+      <div class="form-group">
+        <label for="email">Endereço de e-mail *</label>
+        <input type="email" id="email" name="email" placeholder="exemplo@dominio.com" autocomplete="email" required />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Palavra-passe *</label>
+        <input type="password" id="password" name="password" placeholder="Mínimo de {{ min_password }} caracteres" minlength="{{ min_password }}"
+               autocomplete="new-password" required data-contar-minimo="aviso-minimo" aria-describedby="aviso-minimo" />
+        <small class="dica-password" id="aviso-minimo" aria-live="polite">Mínimo de {{ min_password }} caracteres.</small>
+      </div>
+
+      <div class="form-group">
+        <label for="confirm_password">Confirmar palavra-passe *</label>
+        <input type="password" id="confirm_password" name="confirm_password" placeholder="Repete a palavra-passe" autocomplete="new-password" required
+               data-confirma="password" data-aviso="aviso-confirmar" aria-describedby="aviso-confirmar" />
+        <small class="dica-password" id="aviso-confirmar" aria-live="polite" hidden></small>
+      </div>
+
+      <div class="form-group">
+        <label for="data_nascimento">Data de nascimento (opcional)</label>
+        <input type="date" id="data_nascimento" name="data_nascimento" />
+      </div>
+
+      <div class="form-group">
+        <label for="localizacao">Localização (opcional)</label>
+        <input type="text" id="localizacao" name="localizacao" maxlength="100" placeholder="Ex: Porto" />
+      </div>
+
+      <div class="form-group">
+        <label for="fotografia">Fotografia de perfil (opcional)</label>
+        <input type="file" id="fotografia" name="fotografia" accept=".png,.jpg,.jpeg" />
+        <small style="display:block; margin-top:6px; color: var(--muted);">PNG ou JPG, máx. 2 MB.</small>
+      </div>
+
+      <!-- Campos Específicos: Estudante -->
+      <div id="camposEstudante" class="profile-specific-fields">
+        <div class="form-group">
+          <label for="instituicao">Instituição de ensino (opcional)</label>
+          <input type="text" id="instituicao" name="instituicao" placeholder="Ex: Escola Secundária / Universidade" />
+        </div>
+        <div class="form-group">
+          <label for="nivel_ensino">Nível de ensino (opcional)</label>
+          <select id="nivel_ensino" name="nivel_ensino">
+            <option value="">Seleciona o nível</option>
+            {% for valor, nome in niveis_escolaridade %}
+            <option value="{{ valor }}">{{ nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- Campos Específicos: Explicador -->
+      <div id="camposExplicador" class="profile-specific-fields" style="display: none;">
+        <div class="form-group">
+          <label for="modalidade">Modalidade de explicações</label>
+          <select id="modalidade" name="modalidade">
+            <option value="online">Online</option>
+            <option value="presencial">Presencial</option>
+            <option value="ambas">Ambas</option>
+          </select>
+        </div>
+        <div class="form-group" id="grupoLocalidade">
+          <label for="localidade">Localidade</label>
+          <input type="text" id="localidade" name="localidade" placeholder="Cidade ou Concelho" />
+        </div>
+        <div class="form-group">
+          <label>Níveis de escolaridade que lecionas (opcional)</label>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px 16px;">
+            {% for valor, nome in niveis_escolaridade %}
+            <label style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+              <input type="checkbox" name="niveis" value="{{ valor }}" /> {{ nome }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="apresentacao">Apresentação profissional (opcional)</label>
+          <textarea id="apresentacao" name="apresentacao" rows="3" placeholder="Descreve a tua experiência e método de ensino..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="habilitacoes">Habilitações literárias e qualificações (opcional)</label>
+          <textarea id="habilitacoes" name="habilitacoes" rows="3" placeholder="Ex: Licenciatura em Matemática, Mestrado em Ensino..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="documentos_habilitacoes">Documentos comprovativos (diplomas, certificados) (opcional)</label>
+          <input type="file" id="documentos_habilitacoes" name="documentos_habilitacoes" multiple accept=".pdf,.png,.jpg,.jpeg" />
+          <small style="display:block; margin-top:6px; color: var(--muted);">PDF, PNG ou JPG. Máx. 5 documentos, 5 MB cada. O Administrador vai analisá-los para validar a tua conta.</small>
+          <ul id="listaDocumentos" style="margin: 8px 0 0; padding-left: 18px; font-size: 0.85rem;"></ul>
+        </div>
+      </div>
+
+      <button type="submit" class="btn">Criar conta</button>
+      
+      <div style="text-align: center; margin-top: 18px; font-size: 0.9rem; display: flex; flex-direction: column; gap: 10px;">
+        <a href="{{ url_for('login') }}" style="color: var(--orange-700); font-weight: 700; text-decoration: none;">Já tens conta? Inicia sessão</a>
+        <a href="{{ url_for('landing_page') }}" style="color: var(--muted); font-weight: 600; text-decoration: none; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">{{ icone('voltar', 16) }} Voltar à página inicial</a>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const cardEstudante = document.getElementById('cardEstudante');
+    const cardExplicador = document.getElementById('cardExplicador');
+    const camposEstudante = document.getElementById('camposEstudante');
+    const camposExplicador = document.getElementById('camposExplicador');
+
+    // Só um tipo de conta de cada vez: o cartão escolhido fica destacado e o outro volta ao normal.
+    function selecionarPerfil(perfil) {
+      const estudante = perfil === 'estudante';
+      cardEstudante.classList.toggle('active', estudante);
+      cardExplicador.classList.toggle('active', !estudante);
+      cardEstudante.querySelector('input').checked = estudante;
+      cardExplicador.querySelector('input').checked = !estudante;
+      camposEstudante.style.display = estudante ? 'block' : 'none';
+      camposExplicador.style.display = estudante ? 'none' : 'block';
+    }
+
+    // Os cartões são etiquetas dos botões de rádio: funcionam com o rato e com o teclado (Tab e setas).
+    document.querySelectorAll('input[name="tipo_perfil"]').forEach((radio) => {
+      radio.addEventListener('change', () => selecionarPerfil(radio.value));
+    });
+    selecionarPerfil(document.querySelector('input[name="tipo_perfil"]:checked').value);
+    
+    // Validação no browser dos documentos (o servidor volta a validar)
+    const inputDocs = document.getElementById('documentos_habilitacoes');
+    const listaDocs = document.getElementById('listaDocumentos');
+    inputDocs.addEventListener('change', () => {
+      listaDocs.innerHTML = '';
+      const ficheiros = Array.from(inputDocs.files);
+      let erro = '';
+      if (ficheiros.length > 5) erro = 'Podes enviar no máximo 5 documentos.';
+      ficheiros.forEach(f => {
+        const ext = f.name.split('.').pop().toLowerCase();
+        if (!['pdf', 'png', 'jpg', 'jpeg'].includes(ext)) erro = '"' + f.name + '" não é um formato permitido.';
+        else if (f.size > 5 * 1024 * 1024) erro = '"' + f.name + '" excede 5 MB.';
+        const li = document.createElement('li');
+        li.textContent = f.name + ' (' + (f.size / 1024).toFixed(0) + ' KB)';
+        listaDocs.appendChild(li);
+      });
+      if (erro) { alert(erro); inputDocs.value = ''; listaDocs.innerHTML = ''; }
+    });
+
+    const inputFoto = document.getElementById('fotografia');
+    inputFoto.addEventListener('change', () => {
+      const f = inputFoto.files[0];
+      if (!f) return;
+      const ext = f.name.split('.').pop().toLowerCase();
+      let erro = '';
+      if (!['png', 'jpg', 'jpeg'].includes(ext)) erro = 'A fotografia tem de ser PNG ou JPG.';
+      else if (f.size > 2 * 1024 * 1024) erro = 'A fotografia excede 2 MB.';
+      if (erro) { alert(erro); inputFoto.value = ''; }
+    });
+  </script>
+  {% include '_palavra_passe.html' %}
+</body>
+</html>

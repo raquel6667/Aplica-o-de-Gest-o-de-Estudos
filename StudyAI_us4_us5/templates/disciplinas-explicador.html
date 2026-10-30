@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Disciplinas — Explicador StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="admin-page">
+
+  <div class="admin-layout">
+    {% set ativo = 'disciplinas' %}
+    {% include '_sidebar.html' %}
+
+    <div class="main-content">
+      <header class="top-header">
+        <h1>Gestão de Disciplinas Lecionadas</h1>
+      </header>
+
+      {% with mensagens = get_flashed_messages(with_categories=true) %}
+        {% if mensagens %}
+        <div class="flash-area">
+          {% for categoria, texto in mensagens %}
+            <div class="flash {{ 'success' if categoria == 'success' else 'error' }}">{{ texto }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      {% endwith %}
+
+      <main class="admin-container">
+        <section class="card">
+          <h2>Disciplinas que Leciono (Catálogo)</h2>
+          <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 20px;">
+            Associa as disciplinas ativas do catálogo que lecionas para ficares visível nas pesquisas dos estudantes.
+          </p>
+
+          <!-- Formulário para associar nova disciplina -->
+          <form action="{{ url_for('associar_disciplina_perfil') }}" method="POST" style="display: flex; gap: 12px; margin-bottom: 24px;">
+            <div class="form-group" style="flex: 1; margin: 0;">
+              <select name="codigo_disciplina" required style="min-height: 44px;">
+                <option value="">Seleciona uma disciplina ativa do catálogo</option>
+                {% for cat in disciplinas_catalogo %}
+                  <option value="{{ cat.codigo }}">{{ cat.codigo }} - {{ cat.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <button type="submit" class="btn" style="min-height: 44px; margin: 0;">Associar Disciplina</button>
+          </form>
+
+          <!-- Lista de disciplinas já associadas -->
+          <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+            {% for dp in disciplinas_perfil %}
+              <div style="display: flex; align-items: center; gap: 12px; background: var(--cream); border: 1px solid var(--line); padding: 10px 16px; border-radius: 10px;">
+                <span style="font-weight: 700; color: var(--amber-950);">{{ dp.codigo_disciplina }} - {{ dp.nome }}</span>
+                <form action="{{ url_for('remover_disciplina_perfil') }}" method="POST" style="margin: 0;">
+                  <input type="hidden" name="codigo_disciplina" value="{{ dp.codigo_disciplina }}">
+                  <button type="submit" style="background: none; border: none; color: var(--warning); font-weight: bold; cursor: pointer; font-size: 1.1rem;" title="Remover">×</button>
+                </form>
+              </div>
+            {% else %}
+              <p style="color: var(--muted); font-size: 0.9rem; margin: 0;">Ainda não tens disciplinas lecionadas associadas ao teu perfil.</p>
+            {% endfor %}
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StudyAI — Estuda de forma mais inteligente</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="landing-body">
+  {% from '_icones.html' import icone, logotipo %}
+
+  <!-- Cabeçalho -->
+  <header class="landing-header">
+    <div class="landing-header-content">
+      <a href="{{ url_for('landing_page') }}" class="logo-area" aria-label="StudyAI — página inicial">{{ logotipo(34) }}</a>
+      <nav class="landing-nav">
+        <a href="#funcionalidades">Funcionalidades</a>
+        <a href="#ia">Inteligência Artificial</a>
+        <a href="#explicadores">Explicadores</a>
+      </nav>
+      <div class="landing-actions">
+        <a href="{{ url_for('login') }}" class="btn-secondary-custom">Iniciar sessão</a>
+        <a href="{{ url_for('registar') }}" class="btn-primary-custom">Criar conta</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Secção Hero -->
+    <section class="hero-section">
+      <div class="hero-container">
+        <div class="hero-text">
+          <h1>Estuda de forma mais inteligente. Organiza o teu futuro.</h1>
+          <p>O StudyAI reúne as ferramentas de que precisas para organizar os teus estudos, criar materiais de aprendizagem com inteligência artificial e encontrar explicadores à tua medida.</p>
+          <div class="hero-buttons">
+            <a href="{{ url_for('registar') }}" class="btn-primary-custom btn-lg">Começar agora</a>
+            <a href="{{ url_for('login') }}" class="btn-secondary-custom btn-lg">Já tenho conta</a>
+          </div>
+        </div>
+        <div class="hero-card-preview">
+          <div class="preview-box">
+            <div class="preview-header">
+              <span class="dot red"></span>
+              <span class="dot yellow"></span>
+              <span class="dot green"></span>
+              <span class="preview-title">Painel Académico - StudyAI</span>
+            </div>
+            <div class="preview-body">
+              <div class="mini-card">
+                <span style="display: inline-flex; align-items: center; gap: 8px;">{{ icone('disciplinas', 16) }} Matemática A</span>
+                <span class="badge-active">Ativa</span>
+              </div>
+              <div class="mini-card">
+                <span style="display: inline-flex; align-items: center; gap: 8px;">{{ icone('ia', 16) }} Resumo gerado por IA</span>
+                <span class="badge-ai">Pronto</span>
+              </div>
+              <div class="mini-card">
+                <span style="display: inline-flex; align-items: center; gap: 8px;">{{ icone('calendario', 16) }} Google Calendar</span>
+                <span class="badge-date">Próxima avaliação: 25 Out</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Secção de Funcionalidades -->
+    <section id="funcionalidades" class="features-section">
+      <div class="section-container">
+        <h2 class="section-title">Tudo o que precisas para o sucesso académico</h2>
+        <p class="section-subtitle">Ferramentas integradas, pensadas para estudares melhor e com menos esforço.</p>
+        
+        <div class="features-grid">
+          <!-- Funcionalidade A -->
+          <div class="feature-card">
+            <div class="feature-icon">{{ icone('ia', 22) }}</div>
+            <h3>Criação com Inteligência Artificial</h3>
+            <p>Conversa com o assistente Gemini e transforma a matéria em resumos, questionários de revisão e flashcards para memorizar mais depressa.</p>
+          </div>
+          <!-- Funcionalidade B -->
+          <div class="feature-card">
+            <div class="feature-icon">{{ icone('avaliacoes', 22) }}</div>
+            <h3>Gestão de Estudos e Avaliações</h3>
+            <p>Regista as tuas avaliações, acompanha a evolução com o cálculo automático de médias e vê as sessões no teu Google Calendar.</p>
+          </div>
+          <!-- Funcionalidade C -->
+          <div class="feature-card">
+            <div class="feature-icon">{{ icone('explicador', 22) }}</div>
+            <h3>Explicações Personalizadas</h3>
+            <p>Pesquisa explicadores validados, escolhe entre sessões online ou presenciais e paga de forma segura com PayPal.</p>
+          </div>
+          <!-- Funcionalidade D -->
+          <div class="feature-card">
+            <div class="feature-icon">{{ icone('conversas', 22) }}</div>
+            <h3>Comunicação e Partilha</h3>
+            <p>Adiciona amigos pelo username, conversa em privado com colegas e explicadores e partilha documentos e apontamentos.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Secção dedicada à Inteligência Artificial -->
+    <section id="ia" class="ai-highlight-section">
+      <div class="section-container ai-grid">
+        <div class="ai-content">
+          <span class="badge-tag">{{ icone('ia', 14) }} Assistente Gemini</span>
+          <h2>A inteligência artificial ao serviço da tua aprendizagem</h2>
+          <p>Pergunta, cola os teus apontamentos e pede ao assistente que condense a matéria em formatos fáceis de rever. Guardas o que quiseres e praticas quando quiseres.</p>
+          <ul class="check-list">
+            <li style="display: flex; gap: 10px; align-items: center;"><span style="color: var(--success);">{{ icone('verificado', 18) }}</span> Resumos estruturados por tópicos</li>
+            <li style="display: flex; gap: 10px; align-items: center;"><span style="color: var(--success);">{{ icone('verificado', 18) }}</span> Questionários de escolha múltipla com correção</li>
+            <li style="display: flex; gap: 10px; align-items: center;"><span style="color: var(--success);">{{ icone('verificado', 18) }}</span> Flashcards para revisão ativa</li>
+          </ul>
+        </div>
+        <div class="ai-visual-demo">
+          <div class="demo-card-ai">
+            <h4 style="display: flex; align-items: center; gap: 8px;"><span style="color: var(--blue-700);">{{ icone('ia', 18) }}</span> Exemplo de resumo</h4>
+            <p class="demo-text">"O Teorema de Pitágoras estabelece que num triângulo retângulo, o quadrado da hipotenusa é igual à soma dos quadrados dos catetos..."</p>
+            <div class="demo-flashcard"><strong>Flashcard:</strong> O que é a hipotenusa? → O lado oposto ao ângulo reto.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Secção de Explicadores e Organização -->
+    <section id="explicadores" class="support-section">
+      <div class="section-container text-center">
+        <h2 class="section-title">Apoio personalizado e organização sem esforço</h2>
+        <p class="section-subtitle">Encontra o explicador ideal e mantém as tuas sessões, notas e avaliações organizadas num só lugar.</p>
+        <a href="{{ url_for('registar') }}" class="btn-primary-custom">Descobrir explicações</a>
+      </div>
+    </section>
+
+    <!-- Chamada à Ação Final -->
+    <section class="cta-final-section">
+      <div class="section-container cta-box">
+        <h2>O teu próximo passo começa com uma melhor organização.</h2>
+        <p>Cria a tua conta e reúne num só lugar as ferramentas que te ajudam a estudar.</p>
+        <a href="{{ url_for('registar') }}" class="btn-primary-custom btn-lg">Criar conta</a>
+      </div>
+    </section>
+  </main>
+
+  <!-- Rodapé -->
+  <footer class="landing-footer">
+    <div class="footer-container">
+      <div class="footer-info">
+        {{ logotipo(30) }}
+        <p>Plataforma inteligente de apoio à gestão de estudos e explicadores.</p>
+      </div>
+      <div class="footer-links">
+        <a href="#funcionalidades">Funcionalidades</a>
+        <a href="#ia">Inteligência Artificial</a>
+        <a href="#explicadores">Explicadores</a>
+      </div>
+        <div class="footer-admin">
+        <a href="{{ url_for('admin_login') }}" class="admin-link-discrete">Acesso administrativo</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2026 StudyAI. Todos os direitos reservados.</p>
+    </div>
+  </footer>
+
+</body>
+</html>

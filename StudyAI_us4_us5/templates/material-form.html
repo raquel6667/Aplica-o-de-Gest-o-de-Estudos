@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% if material %}Editar{% else %}Novo{% endif %} {{ dados.tipo|tipo_material|lower }} — StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="admin-page">
+  {% from '_icones.html' import icone, logotipo %}
+  {% set ativo = 'material' %}
+  <div class="admin-layout">
+    {% include '_sidebar.html' %}
+
+    <div class="main-content">
+      <header class="top-header">
+        <h1>{% if material %}Editar{% elif rascunho_ia %}Rascunho gerado com IA:{% else %}Novo{% endif %} {{ dados.tipo|tipo_material|lower }}</h1>
+      </header>
+
+      {% include '_flash.html' %}
+
+      <main class="admin-container">
+        <section class="card">
+          {% if rascunho_ia %}
+            <p class="aviso-rascunho">{{ icone('ia') }} <span>Isto é um <strong>rascunho</strong>: revê e edita à vontade. Só fica guardado quando carregares em <strong>Guardar</strong>.</span></p>
+          {% endif %}
+
+          <form method="POST" id="form-material"
+                action="{{ url_for('editar_material', id_material=material.id) if material else url_for('novo_material', tipo=dados.tipo) }}">
+            {% if rascunho_ia %}<input type="hidden" name="rascunho_ia" value="1">{% endif %}
+            <div class="form-group">
+              <label for="titulo">Título *</label>
+              <input type="text" id="titulo" name="titulo" value="{{ dados.titulo }}" maxlength="{{ limites.titulo }}" required />
+            </div>
+            <div class="form-group">
+              <label for="disciplina">Disciplina {% if not (material and not dados.disciplina) %}*{% endif %}</label>
+              <select id="disciplina" name="disciplina" {% if not (material and not material.codigo_disciplina and not material.id_disciplina_pessoal) %}required{% endif %}>
+                {% if material and not material.codigo_disciplina and not material.id_disciplina_pessoal %}
+                  <option value="" {% if not dados.disciplina %}selected{% endif %}>Sem disciplina</option>
+                {% else %}
+                  <option value="">Escolhe uma disciplina</option>
+                {% endif %}
+                {% for grupo in opcoes|groupby('grupo') %}
+                  <optgroup label="{{ grupo.grouper }}">
+                    {% for o in grupo.list %}
+                      <option value="{{ o.valor }}" {% if o.valor == dados.disciplina %}selected{% endif %}>{{ o.nome }}</option>
+                    {% endfor %}
+                  </optgroup>
+                {% endfor %}
+              </select>
+              {% if not opcoes %}
+                <small style="color: var(--warning);">
+                  {% if session.papel == 'estudante' %}Ainda não tens disciplinas pessoais. Cria uma em
+                    <a href="{{ url_for('gerir_disciplinas_pessoais') }}" target="_blank" rel="noopener">Disciplinas e avaliações</a> (abre noutro separador)
+                    e depois recarrega esta página.
+                  {% else %}Ainda não tens disciplinas associadas ao perfil. Associa-as em
+                    <a href="{{ url_for('gerir_disciplinas_explicador') }}" target="_blank" rel="noopener">As minhas disciplinas</a>.
+                  {% endif %}
+                </small>
+              {% endif %}
+            </div>
+
+            {% if dados.tipo == 'resumo' %}
+              <div class="form-group">
+                <label for="conteudo">Resumo * <small id="contador" style="color: var(--muted); font-weight: 400;"></small></label>
+                <textarea id="conteudo" name="conteudo" maxlength="{{ limites.resumo }}" required style="min-height: 320px;">{{ dados.conteudo or '' }}</textarea>
+              </div>
+            {% else %}
+              <input type="hidden" name="itens" id="itens">
+              <div id="editor-itens" class="editor-itens"></div>
+              <button type="button" class="btn-action edit" id="adicionar-item" style="width: auto; padding: 0 16px; margin-bottom: 18px;">
+                + {% if dados.tipo == 'questionario' %}Adicionar pergunta{% else %}Adicionar cartão{% endif %}
+              </button>
+            {% endif %}
+
+            <div class="botoes-material">
+              <button type="submit" class="btn" style="width: auto; min-width: 160px;">Guardar</button>
+              <a href="{{ url_for('ver_material', id_material=material.id) if material else url_for('lista_material') }}" class="btn-action delete"
+                 {% if rascunho_ia %}onclick="return confirm('Sair sem guardar? O rascunho gerado será descartado.');"{% endif %}>
+                {% if rascunho_ia %}Sair sem guardar{% else %}Cancelar{% endif %}
+              </a>
+            </div>
+          </form>
+
+          {% if material %}
+            <form action="{{ url_for('eliminar_material', id_material=material.id) }}" method="POST" style="margin-top: 24px;"
+                  onsubmit="return confirm('Eliminar este material? Esta ação não pode ser desfeita.');">
+              <button type="submit" class="btn-action delete" style="width: auto; padding: 0 16px;">Eliminar material</button>
+            </form>
+          {% endif %}
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var tipo = {{ dados.tipo|tojson }};
+      var LIMITES = {{ limites|tojson }};
+      var form = document.getElementById("form-material");
+
+      if (tipo === "resumo") {
+        var conteudo = document.getElementById("conteudo");
+        var contador = document.getElementById("contador");
+        var contar = function () { contador.textContent = "(" + conteudo.value.length + " / " + LIMITES.resumo + ")"; };
+        conteudo.addEventListener("input", contar);
+        contar();
+        return;
+      }
+
+      var itens = {{ (dados.itens or [])|tojson }};
+      var editor = document.getElementById("editor-itens");
+      var grupo = 0;   // nome único para os botões de rádio de cada pergunta
+
+      function campo(etiqueta, valor, limite, multilinha) {
+        var rotulo = document.createElement("label");
+        rotulo.textContent = etiqueta;
+        var el = document.createElement(multilinha ? "textarea" : "input");
+        if (!multilinha) el.type = "text";
+        el.maxLength = limite;
+        el.required = true;
+        el.value = valor || "";
+        var envolvente = document.createElement("div");
+        envolvente.className = "form-group";
+        envolvente.appendChild(rotulo);
+        envolvente.appendChild(el);
+        return { bloco: envolvente, input: el };
+      }
+
+      function botao(texto, classe, acao) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "btn-action " + classe;
+        b.textContent = texto;
+        b.addEventListener("click", acao);
+        return b;
+      }
+
+      function renumerar() {
+        editor.querySelectorAll(".item-material > h3").forEach(function (h, i) {
+          h.textContent = (tipo === "questionario" ? "Pergunta " : "Cartão ") + (i + 1);
+        });
+      }
+
+      function linhaOpcao(lista, nomeGrupo, opcao) {
+        var linha = document.createElement("div");
+        linha.className = "linha-opcao";
+        var radio = document.createElement("input");
+        radio.type = "radio";
+        radio.name = nomeGrupo;
+        radio.checked = !!(opcao && opcao.correta);
+        radio.title = "Opção correta";
+        radio.setAttribute("aria-label", "Opção correta");
+        var texto = document.createElement("input");
+        texto.type = "text";
+        texto.maxLength = LIMITES.opcao;
+        texto.required = true;
+        texto.placeholder = "Texto da opção";
+        texto.value = (opcao && opcao.texto) || "";
+        linha.appendChild(radio);
+        linha.appendChild(texto);
+        linha.appendChild(botao("✕", "delete", function () {
+          if (lista.children.length <= 2) { alert("Cada pergunta tem de ter pelo menos 2 opções."); return; }
+          linha.remove();
+        }));
+        lista.appendChild(linha);
+      }
+
+      function adicionar(item) {
+        var bloco = document.createElement("div");
+        bloco.className = "item-material";
+        var titulo = document.createElement("h3");
+        bloco.appendChild(titulo);
+        if (tipo === "questionario") {
+          var enunciado = campo("Enunciado *", item && item.enunciado, LIMITES.enunciado, true);
+          enunciado.input.dataset.papel = "enunciado";
+          bloco.appendChild(enunciado.bloco);
+          var legenda = document.createElement("p");
+          legenda.className = "legenda-opcoes";
+          legenda.textContent = "Opções (2 a 6) — marca a correta:";
+          bloco.appendChild(legenda);
+          var lista = document.createElement("div");
+          lista.className = "lista-opcoes";
+          var nomeGrupo = "correta-" + (grupo++);
+          var opcoes = (item && item.opcoes && item.opcoes.length) ? item.opcoes : [null, null];
+          opcoes.forEach(function (o) { linhaOpcao(lista, nomeGrupo, o); });
+          bloco.appendChild(lista);
+          bloco.appendChild(botao("+ Adicionar opção", "edit", function () {
+            if (lista.children.length >= 6) { alert("Cada pergunta pode ter no máximo 6 opções."); return; }
+            linhaOpcao(lista, nomeGrupo, null);
+          }));
+        } else {
+          var frente = campo("Frente *", item && item.frente, LIMITES.frente, true);
+          var verso = campo("Verso *", item && item.verso, LIMITES.verso, true);
+          frente.input.dataset.papel = "frente";
+          verso.input.dataset.papel = "verso";
+          bloco.appendChild(frente.bloco);
+          bloco.appendChild(verso.bloco);
+        }
+        bloco.appendChild(botao(tipo === "questionario" ? "Remover pergunta" : "Remover cartão", "delete", function () {
+          bloco.remove();
+          renumerar();
+        }));
+        editor.appendChild(bloco);
+        renumerar();
+      }
+
+      (itens.length ? itens : [null]).forEach(adicionar);
+      document.getElementById("adicionar-item").addEventListener("click", function () { adicionar(null); });
+
+      form.addEventListener("submit", function (e) {
+        var dados = [];
+        var erro = null;
+        editor.querySelectorAll(".item-material").forEach(function (bloco, i) {
+          if (tipo === "questionario") {
+            var opcoes = [];
+            bloco.querySelectorAll(".linha-opcao").forEach(function (linha) {
+              opcoes.push({ texto: linha.querySelector("input[type=text]").value, correta: linha.querySelector("input[type=radio]").checked });
+            });
+            if (!erro && !opcoes.some(function (o) { return o.correta; })) erro = "Marca a opção correta da pergunta " + (i + 1) + ".";
+            dados.push({ enunciado: bloco.querySelector("[data-papel=enunciado]").value, opcoes: opcoes });
+          } else {
+            dados.push({ frente: bloco.querySelector("[data-papel=frente]").value, verso: bloco.querySelector("[data-papel=verso]").value });
+          }
+        });
+        if (!dados.length) erro = tipo === "questionario" ? "Acrescenta pelo menos uma pergunta." : "Acrescenta pelo menos um cartão.";
+        if (erro) { e.preventDefault(); alert(erro); return; }
+        document.getElementById("itens").value = JSON.stringify(dados);
+      });
+    })();
+  </script>
+</body>
+</html>

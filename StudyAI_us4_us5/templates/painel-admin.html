@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Painel do Administrador - StudyAI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="admin-page">
+  {% from '_icones.html' import icone, logotipo %}
+
+  <div class="admin-layout">
+    
+    {% set ativo = 'painel' %}{% set abas = True %}
+    {% include '_sidebar_admin.html' %}
+
+    <div class="main-content">
+      <header class="top-header">
+        <h1 id="tituloPainel">Painel do Administrador — Disciplinas</h1>
+      </header>
+
+      {% with mensagens = get_flashed_messages(with_categories=true) %}
+        {% if mensagens %}
+        <div class="flash-area">
+          {% for categoria, texto in mensagens %}
+            <div class="flash {{ 'success' if categoria == 'success' else 'error' }}">{{ texto }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      {% endwith %}
+
+      <main class="admin-container">
+        
+        <!-- ================= SEPARADOR 1: DISCIPLINAS ================= -->
+        <div id="tab-disciplinas" class="admin-tab-content">
+          <div class="grade-admin">
+            
+            <section class="card">
+              <h2>{% if disciplina_edicao %}Editar Disciplina{% else %}Registar Nova Disciplina{% endif %}</h2>
+              
+              <form 
+                id="registerSubjectForm" 
+                action="{% if disciplina_edicao %}{{ url_for('editar_disciplina') }}{% else %}{{ url_for('registar_disciplina') }}{% endif %}" 
+                method="POST"
+              >
+                {% if disciplina_edicao %}
+                  <input type="hidden" name="subjectCodeOriginal" value="{{ disciplina_edicao.codigo }}">
+                {% endif %}
+
+                <div class="form-group">
+                  <label for="subjectCode">Código</label>
+                  <input 
+                    type="text" 
+                    id="subjectCode" 
+                    name="subjectCode" 
+                    placeholder="Ex: MAT101" 
+                    value="{{ disciplina_edicao.codigo if disciplina_edicao else '' }}"
+                    maxlength="6"
+                    {% if disciplina_edicao %}readonly{% endif %}
+                    required
+                  >
+                </div>
+
+                <div class="form-group">
+                  <label for="subjectName">Nome</label>
+                  <input 
+                    type="text" 
+                    id="subjectName" 
+                    name="subjectName" 
+                    placeholder="Ex: Matemática A" 
+                    value="{{ disciplina_edicao.nome if disciplina_edicao else '' }}"
+                    maxlength="100"
+                    required
+                  >
+                </div>
+
+                <div class="form-group">
+                  <label for="subjectDescription">Descrição</label>
+                  <textarea 
+                    id="subjectDescription" 
+                    name="subjectDescription" 
+                    rows="3" 
+                    maxlength="500"
+                    placeholder="Breve descrição dos tópicos..."
+                    required
+                  >{{ disciplina_edicao.descricao if disciplina_edicao and disciplina_edicao.descricao else '' }}</textarea>
+                </div>
+
+                {% if disciplina_edicao %}
+                <div class="form-group">
+                  <label for="subjectStatus">Estado</label>
+                  <select id="subjectStatus" name="subjectStatus" required>
+                    <option value="ativa" {% if disciplina_edicao.estado == 'ativa' %}selected{% endif %}>Ativa</option>
+                    <option value="inativa" {% if disciplina_edicao.estado == 'inativa' %}selected{% endif %}>Inativa</option>
+                  </select>
+                </div>
+                {% endif %}
+
+                <button type="submit" class="btn">
+                  {% if disciplina_edicao %}Guardar Alterações{% else %}Registar Disciplina{% endif %}
+                </button>
+
+                {% if disciplina_edicao %}
+                  <a href="{{ url_for('painel_admin') }}" class="btn-cancel" style="text-align: center; display: block; text-decoration: none; line-height: 40px;">Cancelar Edição</a>
+                {% endif %}
+              </form>
+            </section>
+
+            <section class="card">
+              <h2>Consulta de Disciplinas Existentes</h2>
+
+              <form class="search-form" action="{{ url_for('painel_admin') }}" method="GET">
+                <input type="search" name="q" value="{{ termo }}" placeholder="Pesquisar em qualquer campo..." maxlength="100">
+                <button type="submit" class="btn">Pesquisar</button>
+                {% if termo %}<a href="{{ url_for('painel_admin') }}" class="btn-cancel">Limpar</a>{% endif %}
+              </form>
+              
+              <div style="overflow-x: auto;">
+                <table class="subjects-table">
+                  <thead>
+                    <tr>
+                      <th>Código</th>
+                      <th>Nome</th>
+                      <th>Descrição</th>
+                      <th>Estado</th>
+                      <th>Criado em</th>
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for disciplina in disciplinas %}
+                    <tr>
+                      <td>{{ disciplina.codigo }}</td>
+                      <td>{{ disciplina.nome }}</td>
+                      <td>{{ disciplina.descricao or '' }}</td>
+                      <td>{{ disciplina.estado.capitalize() }}</td>
+                      <td>{{ disciplina.criado_em.strftime('%Y-%m-%d %H:%M') if disciplina.criado_em else '' }}</td>
+                      <td>
+                        <form action="{{ url_for('editar_disciplina') }}" method="GET" style="display: inline;">
+                          <input type="hidden" name="codigo" value="{{ disciplina.codigo }}">
+                          <button type="submit" class="btn-action edit">Editar</button>
+                        </form>
+                        <form action="{{ url_for('eliminar_disciplina') }}" method="POST" style="display: inline;" onsubmit="return confirm('Tem a certeza que deseja eliminar a disciplina {{ disciplina.codigo }}?');">
+                          <input type="hidden" name="codigo" value="{{ disciplina.codigo }}">
+                          <button type="submit" class="btn-action delete">Eliminar</button>
+                        </form>
+                      </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                      <td colspan="6" style="text-align: center;">{% if termo %}Nenhuma disciplina encontrada.{% else %}Nenhuma disciplina registada.{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- ================= SEPARADOR 2: EXPLICADORES ================= -->
+        <div id="tab-explicadores" class="admin-tab-content" hidden>
+          
+          <section class="card" style="margin-bottom: 24px;">
+            <h2>{{ icone('aviso') }} Validação de explicadores pendentes</h2>
+            <div style="overflow-x: auto;">
+              <table class="subjects-table">
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>Username</th>
+                    <th>E-mail</th>
+                    <th>Modalidade</th>
+                    <th>Localidade</th>
+                    <th>Apresentação</th>
+                    <th>Habilitações</th>
+                    <th>Documentos</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for exp in explicadores_pendentes %}
+                  <tr>
+                    <td>{% if exp.conta_eliminada %}{{ exp.nome_original }} <em>(conta eliminada)</em>{% else %}{{ exp.nome }}{% endif %}</td>
+                    <td>{{ exp.username }}</td>
+                    <td>{{ exp.email }}</td>
+                    <td>{{ exp.modalidade or '-' }}</td>
+                    <td>{{ exp.localidade or '-' }}</td>
+                    <td>{{ exp.apresentacao or '-' }}</td>
+                    <td>{{ exp.habilitacoes or '-' }}</td>
+                    <td>
+                      {% set docs = documentos_por_explicador.get(exp.id_utilizador, []) %}
+                      {% if docs %}
+                        <ul style="list-style: none; margin: 0; padding: 0;">
+                          {% for doc in docs %}
+                          <li><a href="{{ url_for('ver_documento_habilitacao', id_documento=doc.id) }}" target="_blank" rel="noopener">{{ icone('resumo', 15) }} {{ doc.nome_original }}</a></li>
+                          {% endfor %}
+                        </ul>
+                      {% else %}
+                        <span style="color: var(--muted);">Sem documentos</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <form action="{{ url_for('aprovar_explicador') }}" method="POST" style="display: inline;">
+                        <input type="hidden" name="id_utilizador" value="{{ exp.id_utilizador }}">
+                        <button type="submit" class="btn-action edit">Aprovar</button>
+                      </form>
+                      <form action="{{ url_for('rejeitar_explicador') }}" method="POST" style="display: inline;" onsubmit="return promptMotivo(this);">
+                        <input type="hidden" name="id_utilizador" value="{{ exp.id_utilizador }}">
+                        <input type="hidden" name="motivo" class="motivo-input">
+                        <button type="submit" class="btn-action delete">Rejeitar</button>
+                      </form>
+                    </td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="9" style="text-align: center;">Não existem explicadores pendentes de validação.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="card" style="margin-bottom: 24px;">
+            <h2>Todos os Explicadores Registados</h2>
+            <div style="overflow-x: auto;">
+              <table class="subjects-table">
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>Username</th>
+                    <th>E-mail</th>
+                    <th>Estado</th>
+                    <th>Modalidade</th>
+                    <th>Localidade</th>
+                    <th>Documentos</th>
+                    <th>Registado em</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for exp in todos_explicadores %}
+                  <tr>
+                    <td>{% if exp.conta_eliminada %}{{ exp.nome_original }} <em>(conta eliminada)</em>{% else %}{{ exp.nome }}{% endif %}</td>
+                    <td>{{ exp.username }}</td>
+                    <td>{{ exp.email }}</td>
+                    <td>
+                      {% if exp.estado_conta == 'ativa' %}
+                      <span class="badge" style="padding: 4px 8px; border-radius: 6px; font-weight: 800; font-size: 0.8rem; background: var(--info-bg); color: var(--blue-800);">{{ exp.estado_conta.capitalize() }}</span>
+                      {% elif exp.estado_conta == 'pendente' %}
+                      <span class="badge" style="padding: 4px 8px; border-radius: 6px; font-weight: 800; font-size: 0.8rem; background: var(--surface-2); color: var(--amber-800);">{{ exp.estado_conta.capitalize() }}</span>
+                      {% else %}
+                      <span class="badge" style="padding: 4px 8px; border-radius: 6px; font-weight: 800; font-size: 0.8rem; background: var(--warning-bg); color: var(--warning);">{{ exp.estado_conta.capitalize() }}</span>
+                      {% endif %}
+                    </td>
+                    <td>{{ exp.modalidade or '-' }}</td>
+                    <td>{{ exp.localidade or '-' }}</td>
+                    <td>
+                      {% set docs = documentos_por_explicador.get(exp.id_utilizador, []) %}
+                      {% if docs %}
+                        <ul style="list-style: none; margin: 0; padding: 0;">
+                          {% for doc in docs %}
+                          <li><a href="{{ url_for('ver_documento_habilitacao', id_documento=doc.id) }}" target="_blank" rel="noopener">{{ icone('resumo', 15) }} {{ doc.nome_original }}</a></li>
+                          {% endfor %}
+                        </ul>
+                      {% else %}
+                        <span style="color: var(--muted);">Sem documentos</span>
+                      {% endif %}
+                    </td>
+                    <td>{{ exp.criado_em.strftime('%Y-%m-%d %H:%M') if exp.criado_em else '-' }}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="8" style="text-align: center;">Nenhum explicador registado.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- Histórico de Habilitações (US1.04) -->
+          <section class="card">
+            <h2>{{ icone('material') }} Histórico de alterações de habilitações</h2>
+            <div style="overflow-x: auto;">
+              <table class="subjects-table">
+                <thead>
+                  <tr>
+                    <th>Explicador</th>
+                    <th>Alteração</th>
+                    <th>Habilitações Anteriores</th>
+                    <th>Habilitações Novas</th>
+                    <th>Data de Alteração</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for hist in historico_habilitacoes %}
+                  <tr>
+                    <td>{% if hist.conta_eliminada %}{{ hist.nome_original }} <em>(conta eliminada)</em>{% else %}{{ hist.nome }} ({{ hist.username }}){% endif %}</td>
+                    <td>{{ hist.detalhe or 'Texto das habilitações atualizado' }}</td>
+                    {% if hist.detalhe %}
+                    <td colspan="2" style="color: var(--muted);">—</td>
+                    {% else %}
+                    <td>{{ hist.habilitacoes_anteriores or 'Nenhuma' }}</td>
+                    <td>{{ hist.habilitacoes_novas or 'Nenhuma' }}</td>
+                    {% endif %}
+                    <td>{{ hist.data_alteracao.strftime('%Y-%m-%d %H:%M') if hist.data_alteracao else '-' }}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="5" style="text-align: center;">Nenhuma alteração de habilitações registada.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+        </div>
+
+        <!-- ================= SEPARADOR 3: ESTUDANTES ================= -->
+        <div id="tab-estudantes" class="admin-tab-content" hidden>
+          <section class="card">
+            <h2>Todos os Estudantes Registados</h2>
+            <div style="overflow-x: auto;">
+              <table class="subjects-table">
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>Username</th>
+                    <th>E-mail</th>
+                    <th>Instituição</th>
+                    <th>Nível de Ensino</th>
+                    <th>Localização</th>
+                    <th>Data Nascimento</th>
+                    <th>Registado em</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for est in todos_estudantes %}
+                  <tr>
+                    <td>{% if est.conta_eliminada %}{{ est.nome_original }} <em>(conta eliminada)</em>{% else %}{{ est.nome }}{% endif %}</td>
+                    <td>{{ est.username }}</td>
+                    <td>{{ est.email }}</td>
+                    <td>{{ est.instituicao or '-' }}</td>
+                    <td>{{ est.nivel_ensino or '-' }}</td>
+                    <td>{{ est.localizacao or '-' }}</td>
+                    <td>{{ est.data_nascimento or '-' }}</td>
+                    <td>{{ est.criado_em.strftime('%Y-%m-%d %H:%M') if est.criado_em else '-' }}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="8" style="text-align: center;">Nenhum estudante registado.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+      </main>
+    </div>
+
+  </div>
+
+  <script>
+    function promptMotivo(form) {
+      const motivo = prompt("Indica o motivo obrigatório para a rejeição do explicador:");
+      if (!motivo || motivo.trim() === "") {
+        alert("A rejeição exige a indicação de um motivo.");
+        return false;
+      }
+      form.querySelector('.motivo-input').value = motivo;
+      return true;
+    }
+  </script>
+
+</body>
+</html>
